@@ -1,0 +1,2572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Index Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1916;
+    --card: #221f1b;
+    --border: #3a3530;
+    --accent: #e8c547;
+    --accent2: #c4733a;
+    --text: #e8e0d0;
+    --muted: #7a7060;
+    --danger: #c44a3a;
+    --success: #5a9e6a;
+    --recording: #e84040;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier Prime', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  header {
+    border-bottom: 2px solid var(--accent);
+    padding: 20px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-shadow: 2px 2px 0 #000;
+  }
+
+  header span {
+    color: var(--muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    padding: 28px 32px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* MIC SECTION */
+  .mic-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mic-section::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(232,197,71,0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  #mic-btn {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    box-shadow: 0 0 0 0 rgba(232,197,71,0.4);
+  }
+
+  #mic-btn:hover { background: rgba(232,197,71,0.08); transform: scale(1.04); }
+  #mic-btn.recording {
+    border-color: var(--recording);
+    color: var(--recording);
+    animation: pulse 1.2s infinite;
+    box-shadow: 0 0 0 0 rgba(232,64,64,0.5);
+  }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(232,64,64,0.5); }
+    70%  { box-shadow: 0 0 0 18px rgba(232,64,64,0); }
+    100% { box-shadow: 0 0 0 0 rgba(232,64,64,0); }
+  }
+
+  .mic-status {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .mic-status.active { color: var(--recording); }
+
+  .transcript-box {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    min-height: 60px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.6;
+    font-style: italic;
+    position: relative;
+  }
+
+  .transcript-box .placeholder { color: var(--muted); font-style: italic; }
+
+  /* MANUAL ENTRY */
+  .manual-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .field label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .field input, .field textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.88rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus, .field textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .field.full { grid-column: 1 / -1; }
+  .field textarea { resize: vertical; min-height: 60px; }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .btn {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 3px;
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+  .btn-primary:hover { background: #f0d050; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  .btn-danger:hover { background: rgba(196,74,58,0.1); }
+
+  /* AI PARSE STATUS */
+  .parse-status {
+    font-size: 0.78rem;
+    padding: 6px 10px;
+    border-radius: 3px;
+    display: none;
+  }
+  .parse-status.show { display: block; }
+  .parse-status.thinking { color: var(--accent); background: rgba(232,197,71,0.07); border: 1px solid rgba(232,197,71,0.2); }
+  .parse-status.success { color: var(--success); background: rgba(90,158,106,0.07); border: 1px solid rgba(90,158,106,0.2); }
+  .parse-status.error { color: var(--danger); background: rgba(196,74,58,0.07); border: 1px solid rgba(196,74,58,0.2); }
+
+  /* RIGHT PANEL - INDEX TABLE */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .right-panel-header {
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .right-panel-header h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .entry-count {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .table-wrap::-webkit-scrollbar { width: 5px; }
+  .table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+
+  thead th {
+    background: var(--surface);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(58,53,48,0.5);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: rgba(232,197,71,0.04); }
+
+  tbody td {
+    padding: 9px 12px;
+    vertical-align: top;
+    line-height: 1.4;
+  }
+
+  .td-book { color: var(--accent2); font-weight: 700; white-space: nowrap; }
+  .td-page { color: var(--accent); font-weight: 700; text-align: center; }
+  .td-kw { color: var(--text); font-weight: 700; font-size: 0.78rem; }
+  .td-note { color: var(--muted); font-size: 0.76rem; font-style: italic; }
+
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--border);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 2px 4px;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+  .del-btn:hover { color: var(--danger); }
+
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-style: italic;
+    line-height: 2;
+  }
+
+  /* EXPORT BAR */
+  .export-bar {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    transition: transform 0.3s ease;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* INSTRUCTIONS */
+  .instructions {
+    background: rgba(232,197,71,0.04);
+    border: 1px solid rgba(232,197,71,0.15);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+  .instructions strong { color: var(--accent); }
+
+  /* SESSION NOTES */
+  .session-notes-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    max-height: 180px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #session-notes-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 6px 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .session-note-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(58,53,48,0.3);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .session-note-ts {
+    color: var(--accent2);
+    font-size: 0.65rem;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+
+  .session-note-text {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .session-note-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .session-note-input-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px 10px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    outline: none;
+  }
+
+  .session-note-input-row input:focus { border-color: var(--accent2); }
+
+  #undo-btn:disabled { opacity: 0.3; cursor: default; }
+
+  /* THINKING BAR */
+  .thinking-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(232,197,71,0.08);
+    border: 1px solid rgba(232,197,71,0.25);
+    border-radius: 3px;
+    font-size: 0.72rem;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+  }
+  .thinking-bar.show { display: flex; }
+  .thinking-dots span {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 1px;
+    animation: thinking-bounce 1.1s infinite ease-in-out;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.18s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes thinking-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40%           { transform: translateY(-4px); opacity: 1; }
+  }
+
+  #mic-btn.paused {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .mic-status.paused-state {
+    color: var(--accent2) !important;
+  }
+
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .right-panel { height: auto; max-height: 60vh; }
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📖 Book Index Builder</h1>
+  <span>voice-powered · ai-parsed · export ready</span>
+</header>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- MIC -->
+    <div class="mic-section">
+      <button id="mic-btn" title="Click to start/stop recording">🎙️</button>
+      <div class="mic-status" id="mic-status">CLICK MIC TO SPEAK</div>
+      <div class="transcript-box" id="transcript">
+        <span class="placeholder">Your speech will appear here...</span>
+      </div>
+      <div class="parse-status" id="parse-status"></div>
+      <div class="thinking-bar" id="thinking-bar">
+        <div class="thinking-dots"><span></span><span></span><span></span></div>
+        <span id="thinking-msg">Processing...</span>
+      </div>
+    </div>
+
+    <!-- MANUAL ENTRY -->
+    <div class="manual-section">
+      <div class="section-label">Manual / Edit Entry</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Book</label>
+          <input type="text" id="f-book" placeholder="1 · WB1 · WB2 · poster name" />
+        </div>
+        <div class="field">
+          <label>Page #</label>
+          <input type="text" id="f-page" placeholder="e.g. 52" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+        </div>
+        <div class="field">
+          <label>Keyword</label>
+          <input type="text" id="f-keyword" placeholder="e.g. svchost.exe" />
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <input type="text" id="f-category" placeholder="e.g. Malware" />
+
+        </div>
+        <div class="field">
+          <label>Abbreviation <span style="color:var(--muted);font-size:0.65rem">(acronyms only)</span></label>
+          <input type="text" id="f-abbr" placeholder="e.g. YARA" />
+        </div>
+        <div class="field">
+          <label>Page Name</label>
+          <input type="text" id="f-page-name" placeholder="e.g. Overview" />
+        </div>
+        <div class="field">
+          <label>Section Name</label>
+          <input type="text" id="f-section-name" placeholder="e.g. Chapter 3" />
+        </div>
+        <div class="field">
+          <label>Source Type</label>
+          <input type="text" id="f-source-type" placeholder="slide or text" />
+        </div>
+        <div class="field full">
+          <label>Note</label>
+          <textarea id="f-note" placeholder="Any additional notes..."></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addManualEntry()">+ Add to Index</button>
+        <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+      </div>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <div class="instructions">
+      <strong>How to speak:</strong><br>
+      Full: <em>"Page 52, category malware, keyword svchost, note SVCHOST is common malware"</em><br>
+      Say <strong>"add to index"</strong> to confirm. Fields clear automatically after.<br>Fields: <em>book</em> · <em>page</em> · <em>keyword</em> · <em>category</em> · <em>abbreviation</em> · <em>page name</em> · <em>section name</em> · <em>source type</em> · <em>note</em><br><br>
+      <strong>Shortcuts — book &amp; page always remembered:</strong><br>
+      · Bare <em>number</em> → new page · <em>"keyword..."</em> → reuse page &amp; book · <em>"page X"</em> → new page<br>
+      · Book sources: plain digit · <em>"workbook 1"</em> or <em>"workbook 2"</em> → WB1/WB2 · <em>"poster [name]"</em><br><br>
+      <strong>Categories:</strong> command · acronym · tool · filename · malware · or any new name<br>
+      Say <em>"new category [name]"</em> to define one explicitly · say <strong>category before keyword</strong><br><br>
+      <strong>Commands:</strong><br>
+      <em>"pause recording"</em> · <em>"resume listening"</em> / <em>"continue listening"</em> · <em>"stop listening"</em> · <em>"fill in"</em> · <em>"add to index"</em><br>
+      <em>"cancel"</em> · <em>"new entry"</em> · <em>"clear fields"</em> · <em>"undo add to index"</em> (restore last entry to fields)<br>
+      3–5s pause + unlabelled text → note · 5s+ pause → note · say "note" then pause then content → note<br>
+      <em>"change [field] to [value]"</em> · <em>"clear [field]"</em> or <em>"clear [field] field"</em><br>
+      Page names are remembered per book+page — say once, auto-filled on repeat entries for that page<br>
+      <em>"slide"</em> or <em>"text"</em> alone sets source type<br>
+      Bare label arms wait: <em>"page name"</em> · <em>"section name"</em> · <em>"keyword"</em> · <em>"category"</em> · <em>"abbreviation"</em> · <em>"source type"</em> — then just say the value<br>
+      For acronyms: keyword = full phrase · say <em>"acronym is [letters]"</em> to set abbreviation · auto-derived if not spoken<br>
+      In notes/text: say <em>"comma"</em> · <em>"period"</em> · <em>"period space"</em> (end sentence) · <em>"dash"</em> · <em>"hyphen"</em> · <em>"next line"</em>
+    </div>
+
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="right-panel-header">
+      <h2>Index</h2>
+      <span class="entry-count" id="entry-count">0 entries</span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="index-table">
+        <thead>
+          <tr>
+            <th>Bk</th>
+            <th>Pg</th>
+            <th>Keyword</th>
+            <th>Abbr</th>
+            <th>Pg Name</th>
+            <th>Section</th>
+            <th>Src</th>
+            <th>Category</th>
+            <th>Note</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="index-body">
+          <tr id="empty-row">
+            <td colspan="10">
+              <div class="empty-state">No entries yet.<br>Start speaking or add manually.</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="export-bar">
+      <button class="btn btn-primary" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-secondary" onclick="exportTSV()">⬇ TSV</button>
+      <button class="btn btn-secondary" onclick="exportSession()">💾 Export Session</button>
+      <label class="btn btn-secondary" style="cursor:pointer;margin:0" title="Load a previously exported session">
+        📂 Import Session
+        <input type="file" accept=".json" onchange="importSession(event)" style="display:none" />
+      </label>
+      <button class="btn btn-secondary" onclick="restoreLastEntry()" id="undo-btn" disabled title="Remove last entry and restore to fields">↩ Restore Last</button>
+      <button class="btn btn-danger" onclick="clearAll()">🗑 Delete Index</button>
+    </div>
+
+    <!-- SESSION NOTES -->
+    <div class="session-notes-panel">
+      <div class="section-label" style="padding: 12px 16px 0; margin-bottom:0;">Session Notes</div>
+      <div id="session-notes-list"></div>
+      <div class="session-note-input-row">
+        <input type="text" id="session-note-input" placeholder='Say "session note..." or type here and press Enter' />
+        <button class="btn btn-secondary" onclick="addSessionNoteManual()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──
+let entries = [];
+let entryId = 0;
+let recognition = null;
+let isRecording = false;
+let isPaused = false;
+let lastBook = '1'; // remembered between entries
+let lastPage = '';       // remembered between entries
+let customCategories = []; // user-defined categories added on the fly
+
+// ── MODES ──
+// 'idle'    — mic on, waiting for "page ..." to begin a new entry
+// 'entry'   — accumulating speech for an entry, waiting for "add to index"
+let voiceMode = 'idle';
+let entryBuffer = '';
+let awaitingNote = false;  // true after category spoken, waiting for note content
+let allTimeTranscript = ''; // full running transcript, survives recognition restarts
+let lastRestartTime = 0;    // timestamp of last recognition restart
+let pageNameMap = {};       // { 'book:page': 'Page Name' } — persists page names across entries
+let lastChunkTime = 0;      // timestamp of last finalized speech chunk — used to measure pause length
+let awaitingNoteContent = false; // true after bare "note" spoken, waiting for note text in next chunk
+let awaitingField = null;       // { field: 'page name'|'section name'|'keyword'|'category'|'abbreviation'|'source type', elementId, label }
+
+// ── SPEECH RECOGNITION ──
+const micBtn = document.getElementById('mic-btn');
+const micStatus = document.getElementById('mic-status');
+const transcriptBox = document.getElementById('transcript');
+const parseStatus = document.getElementById('parse-status');
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  micBtn.disabled = true;
+  micBtn.title = 'Speech recognition not supported in this browser. Use Chrome.';
+  micStatus.textContent = 'NOT SUPPORTED — USE CHROME';
+  micStatus.style.color = 'var(--danger)';
+}
+
+micBtn.addEventListener('click', toggleRecording);
+
+function toggleRecording() {
+  if (!SpeechRecognition) return;
+  if (isRecording) {
+    isRecording = false;
+    recognition.stop();
+    micBtn.classList.remove('recording');
+    micBtn.textContent = '🎙️';
+    micStatus.textContent = 'CLICK MIC TO SPEAK';
+    micStatus.classList.remove('active');
+    voiceMode = 'idle';
+    entryBuffer = '';
+    allTimeTranscript = '';
+    awaitingNote = false;
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording() {
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.maxAlternatives = 1;
+
+  voiceMode = 'idle';
+  entryBuffer = '';
+  awaitingNote = false;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    micBtn.classList.add('recording');
+    micBtn.textContent = '⏹';
+    micStatus.textContent = '● LISTENING — say "Page [number]..." to begin';
+    micStatus.classList.add('active');
+    transcriptBox.innerHTML = '<span class="placeholder">Waiting for "Page..."</span>';
+    setParseStatus('', '');
+  };
+
+  let sessionFinal = ''; // accumulates all final text this session
+
+  recognition.onresult = (e) => {
+    // Rebuild full transcript
+    let allFinal = '';
+    let interim = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) allFinal += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    allFinal = allFinal.trim();
+    const display = allFinal + (interim ? ' ' + interim : '');
+    transcriptBox.textContent = display || '...';
+
+    // Only act on newly finalized text
+    if (allFinal === sessionFinal) return;
+    const newChunk = allFinal.slice(sessionFinal.length).trim();
+    sessionFinal = allFinal;
+
+    if (!newChunk) return;
+    const chunk = newChunk.toLowerCase();
+
+    // Measure pause since last chunk
+    const now = Date.now();
+    const pauseSinceLastChunk = lastChunkTime ? (now - lastChunkTime) : 0;
+    lastChunkTime = now;
+
+    // Accumulate everything spoken — survives recognition restarts
+    allTimeTranscript += ' ' + newChunk;
+
+    // ── PAUSED MODE — only listen for "resume listening" or "resume recording" ──
+    if (isPaused) {
+      if (/\b(?:resume|continue)\s+(?:listening|recording)\b/i.test(chunk)) {
+        isPaused = false;
+        sessionFinal = '';
+        micBtn.classList.remove('paused');
+        micBtn.textContent = '⏹';
+        micStatus.textContent = '● LISTENING — say "Page", keyword, or number to begin';
+        micStatus.classList.remove('paused-state');
+        micStatus.classList.add('active');
+        transcriptBox.innerHTML = '<span class="placeholder">Resumed. Ready for next entry...</span>';
+        toast('Recording resumed.');
+      }
+      // ignore everything else while paused
+      return;
+    }
+
+    // ── GLOBAL COMMANDS (work in any mode) ──
+
+    // STOP LISTENING / STOP RECORDING — fully stop mic (same as clicking button)
+    if (/\bstop\s+(?:listening|recording)\b/i.test(chunk)) {
+      toast('Mic stopped.');
+      toggleRecording();
+      return;
+    }
+
+    // PAUSE — stop interpreting, show paused state
+    if (/\bpause\s+(?:recording|listening)\b/i.test(chunk)) {
+      isPaused = true;
+      voiceMode = 'idle';
+      entryBuffer = '';
+      awaitingNote = false;
+        awaitingNoteContent = false;
+        awaitingField = null;
+      sessionFinal = '';
+      micBtn.classList.remove('recording');
+      micBtn.classList.add('paused');
+      micBtn.textContent = '⏸';
+      micStatus.textContent = '⏸ PAUSED — say "resume" or "continue listening" to continue';
+      micStatus.classList.remove('active');
+      micStatus.classList.add('paused-state');
+      transcriptBox.innerHTML = '<span class="placeholder">Paused. Say "resume listening" or "continue listening" when ready...</span>';
+      toast('Recording paused.');
+      return;
+    }
+
+    // CANCEL — discard current entry, go back to idle
+    if (/\bcancel\b/i.test(chunk)) {
+      voiceMode = 'idle';
+      entryBuffer = '';
+      awaitingNote = false;
+        awaitingNoteContent = false;
+        awaitingField = null;
+      sessionFinal = '';
+      clearForm();
+      setParseStatus('', '');
+      micStatus.textContent = '● LISTENING — say "Page [number]..." to begin';
+      transcriptBox.innerHTML = '<span class="placeholder">Cancelled. Waiting for "Page..."</span>';
+      toast('Entry cancelled.');
+      return;
+    }
+
+    // CLEAR FIELDS — clears input fields only, index is never touched by voice
+    if (/\bclear\s+(?:the\s+)?(?:all\s+)?fields\b/i.test(chunk)) {
+      voiceMode = 'idle';
+      entryBuffer = '';
+      awaitingNote = false;
+        awaitingNoteContent = false;
+        awaitingField = null;
+      sessionFinal = '';
+      clearForm();
+      setParseStatus('', '');
+      micStatus.textContent = '● LISTENING — say "Page [number]..." to begin';
+      transcriptBox.innerHTML = '<span class="placeholder">Fields cleared. Waiting for "Page..."</span>';
+      toast('Fields cleared.');
+      return;
+    }
+
+    // SESSION NOTE — "session note [text]"
+    if (/\bsession\s+note\b/i.test(chunk)) {
+      const m = newChunk.match(/\bsession\s+note[s]?\s+(.+)/i);
+      if (m) {
+        const noteText = processNoteVal(m[1].trim().replace(/[.,;]+$/, ''));
+        addSessionNote(noteText);
+      }
+      return;
+    }
+
+    // UNDO ADD TO INDEX — remove last entry and restore fields for editing
+    if (/\bundo\s+(?:add\s+(?:to\s+)?(?:the\s+)?index|last\s+entry|that)\b/i.test(chunk)) {
+      restoreLastEntry();
+      return;
+    }
+    // UNDO — simple remove, no restore
+    if (/^\s*undo\s*$/i.test(chunk)) {
+      undoLast();
+      return;
+    }
+
+    // CHANGE FIELD — works in any mode (idle or entry)
+    if (applyChangeCommand(newChunk)) {
+      setParseStatus('✓ Field updated — say "add to index" to confirm', 'success');
+      return;
+    }
+
+    // NEW CATEGORY — define a custom category on the fly
+    if (/\bnew\s+categor(?:y|ies)\b/i.test(chunk)) {
+      const m = chunk.match(/\bnew\s+categor(?:y|ies)\s+(.+)/i);
+      if (m) {
+        const catName = m[1].trim().replace(/[.,;]+$/, '');
+        const formatted = catName.charAt(0).toUpperCase() + catName.slice(1).toLowerCase();
+        if (!customCategories.includes(formatted) && !KNOWN_CATS.includes(formatted)) {
+          customCategories.push(formatted);
+        }
+        document.getElementById('f-category').value = formatted;
+        setParseStatus('✓ Category "' + formatted + '" created and set', 'success');
+        toast('New category: ' + formatted);
+      }
+      return;
+    }
+
+    // NEW ENTRY — discard current entry and start fresh (same as cancel but explicit)
+    if (/\bnew\s+entry\b/i.test(chunk)) {
+      voiceMode = 'idle';
+      entryBuffer = '';
+      awaitingNote = false;
+        awaitingNoteContent = false;
+        awaitingField = null;
+      sessionFinal = '';
+      clearForm();
+      setParseStatus('', '');
+      micStatus.textContent = '● LISTENING — say "Page [number]..." to begin';
+      transcriptBox.innerHTML = '<span class="placeholder">Ready for new entry. Say "Page..."</span>';
+      toast('Ready for new entry.');
+      return;
+    }
+
+    if (voiceMode === 'idle') {
+      const bareNumber = chunk.match(/^\s*(\d+)\s*$/);
+
+      if (/\bpage\b/.test(chunk) && !/^page\s+name\b/i.test(chunk)) {
+        // "page 47 ..." — extract and set page directly, then enter entry mode
+        voiceMode = 'entry';
+        entryBuffer = newChunk;
+        const num = extractNumber(newChunk, 'page');
+        if (num) {
+          lastPage = num;
+          document.getElementById('f-page').value = num;
+          document.getElementById('f-book').value = lastBook;
+          const pk = lastBook + ':' + num;
+          if (pageNameMap[pk]) document.getElementById('f-page-name').value = pageNameMap[pk];
+        }
+        micStatus.textContent = '● PAGE ' + (lastPage||'?') + ' — say keyword...';
+        setParseStatus('', '');
+
+      } else if (/\bkeyword\b/.test(chunk)) {
+        // "keyword svchost" — enter entry with remembered book/page
+        voiceMode = 'entry';
+        entryBuffer = newChunk;
+        document.getElementById('f-book').value = lastBook;
+        document.getElementById('f-page').value = lastPage;
+        const pk = lastBook + ':' + lastPage;
+        if (pageNameMap[pk]) document.getElementById('f-page-name').value = pageNameMap[pk];
+        const val = newChunk.replace(/^keyword[s]?\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+        const cat = document.getElementById('f-category').value.trim();
+        document.getElementById('f-keyword').value = fixTechnicalString(val, cat);
+        micStatus.textContent = '● CAPTURING ENTRY — say "add to index" when done';
+        setParseStatus('', '');
+
+      } else if (bareNumber) {
+        // Bare number = new page
+        lastPage = bareNumber[1];
+        document.getElementById('f-page').value = lastPage;
+        document.getElementById('f-book').value = lastBook;
+        const pk = lastBook + ':' + lastPage;
+        if (pageNameMap[pk]) document.getElementById('f-page-name').value = pageNameMap[pk];
+        voiceMode = 'entry';
+        entryBuffer = 'page ' + lastPage;
+        micStatus.textContent = '● PAGE ' + lastPage + ' — now say keyword...';
+        setParseStatus('', '');
+      }
+      // ignore everything else in idle
+
+    } else if (voiceMode === 'entry') {
+      // ADD TO INDEX
+      if (/add\s+(?:it\s+)?to\s+(?:the\s+)?index/i.test(newChunk)) {
+        addManualEntry(true); // saves lastBook/lastPage before clearing
+        voiceMode = 'idle';
+        entryBuffer = '';
+        awaitingNote = false;
+        awaitingNoteContent = false;
+        awaitingField = null;
+        awaitingField = null;
+        sessionFinal = '';
+        clearForm();
+        setParseStatus('', '');
+        micStatus.textContent = '● LISTENING — say "Page", "keyword", or a page number to begin';
+        transcriptBox.innerHTML = '<span class="placeholder">Entry added! Say "keyword", a page number, or "page X"...</span>';
+
+      // FILL IN — done speaking, parse and populate fields for review
+      // Handles:
+      //   "fill in"               → parse full buffer
+      //   "fill in note [text]"   → direct field assignment from spoken text
+      //   "fill in note"          → scan transcript for most recent "note [text]"
+      } else if (/\bfill\s+in\b/i.test(newChunk)) {
+        showThinking('Filling fields...');
+        const afterFillIn = newChunk.replace(/\bfill\s+in\b/gi, '').trim();
+
+        // Map of field label pattern → handler
+        const FIELD_HANDLERS = [
+          { re: /^note[s]?(?:\s+|$)/i,           key: 'note',         fn: v => { document.getElementById('f-note').value = processNoteVal(v); } },
+          { re: /^keyword[s]?(?:\s+|$)/i,         key: 'keyword',      fn: v => { const cat = document.getElementById('f-category').value.trim(); document.getElementById('f-keyword').value = fixTechnicalString(v, cat); } },
+          { re: /^categor(?:y|ies)(?:\s+|$)/i,    key: 'category',     fn: v => { const nc = matchCategory(v); document.getElementById('f-category').value = nc; const kw = document.getElementById('f-keyword').value.trim(); if (kw) document.getElementById('f-keyword').value = fixTechnicalString(kw, nc); } },
+          { re: /^(?:abbreviation|abbr)(?:\s+|$)/i, key: 'abbr',       fn: v => { document.getElementById('f-abbr').value = v.toUpperCase().replace(/\s+/g,''); } },
+          { re: /^page\s+name(?:\s+is)?\s*/i,      key: 'page name',   fn: v => { document.getElementById('f-page-name').value = v.replace(/^is\s+/i,''); } },
+          { re: /^section\s+name(?:\s+is)?\s*/i,  key: 'section name',fn: v => { document.getElementById('f-section-name').value = v.replace(/^is\s+/i,''); } },
+          { re: /^source(?:\s+type)?(?:\s+|$)/i,  key: 'source type', fn: v => { document.getElementById('f-source-type').value = /slide/i.test(v) ? 'Slide' : /text/i.test(v) ? 'Text' : v; } },
+        ];
+
+        let handled = false;
+        for (const {re, key, fn} of FIELD_HANDLERS) {
+          if (re.test(afterFillIn)) {
+            // Value may be inline ("fill in note this is the text")
+            // or just the label ("fill in note") — in which case scan transcript
+            const inlineVal = afterFillIn.replace(re, '').trim().replace(/[.,;]+$/, '');
+            if (inlineVal) {
+              // Value was spoken right after the label in this same chunk
+              fn(inlineVal);
+              setParseStatus('✓ ' + key + ' filled — say "add to index" to confirm', 'success');
+            } else {
+              // No inline value — scan allTimeTranscript for the most recent occurrence
+              const transcriptVal = extractFromTranscript(new RegExp('\\b' + key.replace(/\s+/g,'\\s+'), 'i'));
+              if (transcriptVal) {
+                fn(transcriptVal);
+                setParseStatus('✓ ' + key + ' filled from transcript — say "add to index" to confirm', 'success');
+              } else {
+                setParseStatus('⚠ Could not find "' + key + '" in recent speech', 'error');
+              }
+            }
+            handled = true;
+            break;
+          }
+        }
+
+        if (!handled) {
+          // Plain "fill in" — parse full buffer, fold in any trailing words
+          const combined = (entryBuffer + (afterFillIn ? ' ' + afterFillIn : '')).trim();
+          parseEntry(combined);
+          setParseStatus('✓ Fields filled — review and say "add to index"', 'success');
+        }
+        micStatus.textContent = '● REVIEW FIELDS — say "add to index" to confirm';
+
+      } else if (applyChangeCommand(newChunk)) {
+        // handled by applyChangeCommand — field already updated
+        hideThinking();
+        setParseStatus('✓ Field updated — say "add to index" to confirm', 'success');
+
+      } else {
+        // ── NORMALISE — strip commas that speech recognition injects ──
+        // e.g. "page, name overview" → "page name overview"
+        //      "keyword, svchost"    → "keyword svchost"
+        const cleanChunk = newChunk.replace(/,\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+        // ── FIELD LABEL REGEX ──
+        const FIELD_LABEL_RE = /^(?:note[s]?|keyword[s]?|categor(?:y|ies)|abbreviation|abbr|page\s+name|section\s+name|source(?:\s+type)?|book|page|slide|text|fill\s+in|add\s+to|cancel|undo|pause|stop|resume|continue|session\s+note)\b/i;
+
+        // Does this chunk CONTAIN any field label AFTER the first word(s)?
+        // Used to prevent awaitingNote from firing when chunk bundles multiple fields
+        const FIELD_LABEL_ANYWHERE = /\b(?:keyword|categor(?:y|ies)|note[s]?|page\s+name|section\s+name|abbreviation|abbr|source(?:\s+type)?|slide|text)\b/i;
+        const containsSecondLabel = FIELD_LABEL_RE.test(cleanChunk) &&
+          FIELD_LABEL_ANYWHERE.test(cleanChunk.replace(FIELD_LABEL_RE, '').trim());
+
+        const isFieldLabel   = FIELD_LABEL_RE.test(cleanChunk);
+        const isBareNote     = /^note[s]?\s*$/i.test(cleanChunk);
+        const startsWithNote = /^note[s]?\s+/i.test(cleanChunk);
+        const wordCount      = cleanChunk.split(/\s+/).length;
+
+        const MEDIUM_PAUSE = 3000;
+        const LONG_PAUSE   = 5000;
+        const isMediumPause = pauseSinceLastChunk >= MEDIUM_PAUSE && pauseSinceLastChunk < LONG_PAUSE;
+        const isLongPause   = pauseSinceLastChunk >= LONG_PAUSE;
+
+        // ── FIELD AWAITING MAP — bare labels that arm a wait state ──
+        const BARE_FIELD_MAP = [
+          { re: /^page\s+name\s*$/i,            field: 'page name',    id: 'f-page-name',    label: 'PAGE NAME' },
+          { re: /^section\s+name\s*$/i,          field: 'section name', id: 'f-section-name', label: 'SECTION NAME' },
+          { re: /^keyword[s]?\s*$/i,             field: 'keyword',      id: 'f-keyword',      label: 'KEYWORD' },
+          { re: /^categor(?:y|ies)\s*$/i,        field: 'category',     id: 'f-category',     label: 'CATEGORY' },
+          { re: /^(?:abbreviation|abbr)\s*$/i,   field: 'abbreviation', id: 'f-abbr',         label: 'ABBREVIATION' },
+          { re: /^source(?:\s+type)?\s*$/i,      field: 'source type',  id: 'f-source-type',  label: 'SOURCE TYPE' },
+        ];
+
+        // ── CASE 0: content arriving for an awaited field ──
+        if (awaitingField && !isFieldLabel) {
+          const val = cleanChunk.replace(/^is\s+/i, '').replace(/[.,;]+$/, '');
+          const fid = awaitingField.id;
+          const flabel = awaitingField.field;
+          if (flabel === 'keyword') {
+            const cat = document.getElementById('f-category').value.trim();
+            document.getElementById(fid).value = fixTechnicalString(val, cat);
+          } else if (flabel === 'category') {
+            const nc = matchCategory(val);
+            document.getElementById(fid).value = nc;
+            const kw = document.getElementById('f-keyword').value.trim();
+            if (kw) document.getElementById('f-keyword').value = fixTechnicalString(kw, nc);
+          } else if (flabel === 'abbreviation') {
+            document.getElementById(fid).value = val.toUpperCase().replace(/\s+/g, '');
+          } else if (flabel === 'source type') {
+            document.getElementById(fid).value = /slide/i.test(val) ? 'Slide' : /text/i.test(val) ? 'Text' : val;
+          } else {
+            document.getElementById(fid).value = awaitingField.field === 'page name' || awaitingField.field === 'section name' ? val : processNoteVal(val);
+          }
+          // If page name just filled via awaiting, update the map immediately
+          if (awaitingField.field === 'page name') {
+            const pk = (document.getElementById('f-book').value.trim() || lastBook) + ':' + (document.getElementById('f-page').value.trim() || lastPage);
+            if (pk !== ':') pageNameMap[pk] = val;
+          }
+          entryBuffer += ' ' + awaitingField.field + ' ' + val;
+          setParseStatus('✓ ' + awaitingField.label + ' filled — say "add to index" to confirm', 'success');
+          micStatus.textContent = '● CAPTURING — say "add to index" when done';
+          awaitingField = null;
+          hideThinking();
+          return;
+        }
+        // If a new field label arrives while awaiting, just re-arm for the new field below
+        if (awaitingField && isFieldLabel) awaitingField = null;
+
+        // ── CASE 1: bare "note" spoken alone — arm flag, wait for content next chunk ──
+        if (isBareNote) {
+          awaitingNoteContent = true;
+          awaitingNote = false;
+          awaitingField = null;
+          entryBuffer += ' note'; // plant the label in buffer
+          micStatus.textContent = '● NOTE — say the note content...';
+          setParseStatus('Listening for note content...', 'thinking');
+          return;
+        }
+
+        // ── CASE 1b: bare field label spoken alone — arm awaitingField ──
+        for (const entry of BARE_FIELD_MAP) {
+          if (entry.re.test(cleanChunk)) {
+            awaitingField = entry;
+            awaitingNoteContent = false;
+            awaitingNote = false;
+            micStatus.textContent = '● ' + entry.label + ' — say the value...';
+            setParseStatus('Listening for ' + entry.field + '...', 'thinking');
+            return;
+          }
+        }
+
+        // ── CASE 2: "note [content]" in one breath — direct to note field ──
+        if (startsWithNote) {
+          awaitingNoteContent = false;
+          const noteVal = cleanChunk.replace(/^note[s]?\s+/i, '').replace(/[.,;]+$/, '');
+          document.getElementById('f-note').value = processNoteVal(noteVal);
+          entryBuffer = overwriteFieldInBuffer(entryBuffer, newChunk);
+          awaitingNote = false;
+          micStatus.textContent = '● CAPTURING — say "add to index" when done';
+          setParseStatus('✓ Note filled — say "add to index" to confirm', 'success');
+          hideThinking();
+          return;
+        }
+
+        // ── CASE 3: content arriving after bare "note" was spoken (awaitingNoteContent) ──
+        if (awaitingNoteContent && !isFieldLabel) {
+          awaitingNoteContent = false;
+          const currentNote = document.getElementById('f-note').value.trim();
+          const noteVal = processNoteVal(newChunk.trim().replace(/[.,;]+$/, ''));
+          document.getElementById('f-note').value = currentNote ? currentNote + ' ' + noteVal : noteVal;
+          entryBuffer += ' ' + newChunk;
+          micStatus.textContent = '● CAPTURING — say "add to index" when done';
+          setParseStatus('✓ Note filled — say "add to index" to confirm', 'success');
+          hideThinking();
+          return;
+        }
+
+        // ── CASE 4: long pause (5s+) + no field label → auto-note ──
+        if (isLongPause && !isFieldLabel && wordCount >= 2) {
+          awaitingNoteContent = false;
+          const currentNote = document.getElementById('f-note').value.trim();
+          const noteVal = processNoteVal(newChunk.trim().replace(/[.,;]+$/, ''));
+          document.getElementById('f-note').value = currentNote ? currentNote + ' ' + noteVal : noteVal;
+          entryBuffer += ' note ' + newChunk;
+          micStatus.textContent = '● CAPTURING — say "add to index" when done';
+          setParseStatus('⬇ Long pause — routed to note. Review and say "add to index"', 'success');
+          hideThinking();
+          return;
+        }
+
+        // ── CASE 5: medium pause (3–5s) + no field label + 3+ words → probably a note ──
+        if (isMediumPause && !isFieldLabel && wordCount >= 3) {
+          awaitingNoteContent = false;
+          const currentNote = document.getElementById('f-note').value.trim();
+          const noteVal = processNoteVal(newChunk.trim().replace(/[.,;]+$/, ''));
+          document.getElementById('f-note').value = currentNote ? currentNote + ' ' + noteVal : noteVal;
+          entryBuffer += ' note ' + newChunk;
+          micStatus.textContent = '● CAPTURING — say "add to index" when done';
+          setParseStatus('⬇ Routed to note — review and say "add to index"', 'success');
+          hideThinking();
+          return;
+        }
+
+        // ── CASE 6: direct field write for labelled chunks ──
+        // Each chunk writes to exactly ONE field. No full re-parse — prevents double-fills.
+        if (isFieldLabel) awaitingNoteContent = false;
+
+        entryBuffer = overwriteFieldInBuffer(entryBuffer, newChunk);
+
+        // Direct field write based on what label this chunk starts with
+        if (/^keyword[s]?\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^keyword[s]?\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          const cat = document.getElementById('f-category').value.trim();
+          document.getElementById('f-keyword').value = fixTechnicalString(val, cat);
+          awaitingNote = false;
+
+        } else if (/^categor(?:y|ies)\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^categor(?:y|ies)\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          const nc = matchCategory(val);
+          document.getElementById('f-category').value = nc;
+          const kw = document.getElementById('f-keyword').value.trim();
+          if (kw) document.getElementById('f-keyword').value = fixTechnicalString(kw, nc);
+          // Only arm awaitingNote if nothing else was in this chunk
+          awaitingNote = !containsSecondLabel;
+
+        } else if (/^note[s]?\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^note[s]?\s+(?:is\s+|are\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          document.getElementById('f-note').value = applyCyberTerms(val);
+          awaitingNote = false;
+
+        } else if (/^page\s+name\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^page\s+name\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          document.getElementById('f-page-name').value = val;
+          const pk = (document.getElementById('f-book').value.trim() || lastBook) + ':' + (document.getElementById('f-page').value.trim() || lastPage);
+          if (pk !== ':') pageNameMap[pk] = val;
+          awaitingNote = false;
+
+        } else if (/^section\s+name\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^section\s+name\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          document.getElementById('f-section-name').value = val;
+          awaitingNote = false;
+
+        } else if (/^(?:abbreviation|abbr)\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^(?:abbreviation|abbr)\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'');
+          document.getElementById('f-abbr').value = val.toUpperCase().replace(/\s+/g,'');
+          awaitingNote = false;
+
+        } else if (/^source(?:\s+type)?\s+/i.test(cleanChunk)) {
+          const val = cleanChunk.replace(/^source(?:\s+type)?\s+(?:is\s+)?/i,'').trim().replace(/[.,;]+$/,'').toLowerCase();
+          document.getElementById('f-source-type').value = /slide/i.test(val) ? 'Slide' : /text/i.test(val) ? 'Text' : val;
+          awaitingNote = false;
+
+        } else if (/^(?:slide|text)$/i.test(cleanChunk)) {
+          document.getElementById('f-source-type').value = /slide/i.test(cleanChunk) ? 'Slide' : 'Text';
+          awaitingNote = false;
+
+        } else if (/^(?:book|volume)\s+/i.test(cleanChunk)) {
+          const val = extractBook(cleanChunk);
+          if (val) { document.getElementById('f-book').value = val; lastBook = val; }
+          awaitingNote = false;
+
+        } else if (/^page\s+\d/i.test(cleanChunk)) {
+          const num = extractNumber(cleanChunk, 'page');
+          if (num) {
+            document.getElementById('f-page').value = num;
+            lastPage = num;
+            // Auto-fill page name from map
+            const pk = (document.getElementById('f-book').value.trim() || lastBook) + ':' + num;
+            const mapped = pageNameMap[pk];
+            if (mapped) document.getElementById('f-page-name').value = mapped;
+          }
+          awaitingNote = false;
+
+        } else if (awaitingNote && !isFieldLabel) {
+          document.getElementById('f-note').value = applyCyberTerms(cleanChunk.replace(/[.,;]+$/,''));
+          entryBuffer = entryBuffer.slice(0, entryBuffer.lastIndexOf(newChunk)).trimEnd() + ' note ' + cleanChunk;
+          awaitingNote = false;
+
+        } else {
+          // Unrecognised chunk — just accumulate, don't touch any field
+          awaitingNote = false;
+        }
+
+        micStatus.textContent = '● CAPTURING — say "add to index" when done';
+        hideThinking();
+      }
+    }
+  };
+
+  recognition.onend = () => {
+    if (isRecording) {
+      // Auto-restart to keep mic alive
+      lastRestartTime = Date.now();
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') return;
+    if (e.error === 'aborted') return;
+    console.warn('Speech error:', e.error);
+  };
+
+  recognition.start();
+}
+
+// ── WORD-TO-NUMBER CONVERTER ──
+const WORD_NUMS = {
+  'zero':0,'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,
+  'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12,'thirteen':13,
+  'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,
+  'nineteen':19,'twenty':20,'thirty':30,'forty':40,'fifty':50,
+  'sixty':60,'seventy':70,'eighty':80,'ninety':90,
+  'hundred':100,'thousand':1000
+};
+
+function wordsToNumber(str) {
+  // If it's already a digit string, return as-is
+  if (/^\d+$/.test(str.trim())) return str.trim();
+  const tokens = str.toLowerCase().trim().split(/[\s\-]+/);
+  let result = 0, current = 0;
+  for (const token of tokens) {
+    const val = WORD_NUMS[token];
+    if (val === undefined) return null; // not a number word
+    if (val === 100) { current *= 100; }
+    else if (val === 1000) { result += current * 1000; current = 0; }
+    else { current += val; }
+  }
+  return String(result + current);
+}
+
+// Extract a number from text — digit or word form — after a label keyword
+function extractNumber(text, label) {
+  // Try digit first: "page 52", "book 3"
+  const digitMatch = text.match(new RegExp('\\b' + label + '[s]?\\s*(?:number\\s*)?(\\d+)', 'i'));
+  if (digitMatch) return digitMatch[1];
+  // Try word number: "page fifty two", "book one"
+  // Only match if the label appears at the very start of a field context (after comma or at start)
+  const wordMatch = text.match(new RegExp('(?:^|,\\s*)' + label + '[s]?\\s*(?:number\\s*)?([a-z][\\w\\s\\-]*?)(?=\\s*,|\\s+(?:keyword|category|note|page)|$)', 'i'));
+  if (wordMatch) {
+    const converted = wordsToNumber(wordMatch[1].trim());
+    if (converted !== null) return converted;
+  }
+  return null;
+}
+
+// ── BOOK VALUE NORMALIZER ──
+// Accepts: digit → "1", workbook/wb + digit → "WB1", poster [name] → "Poster: [Name]"
+function normalizeBook(raw) {
+  if (!raw) return '';
+  const s = raw.trim();
+
+  // Already normalized WB form
+  if (/^WB\d$/i.test(s)) return s.toUpperCase();
+
+  // "workbook 1", "workbook one", "WB 1", "WB1"
+  const wbMatch = s.match(/^(?:workbook|work\s*book|WB)\s*([12one|two])$/i);
+  if (wbMatch) {
+    const n = wbMatch[1].toLowerCase();
+    const digit = n === 'one' ? '1' : n === 'two' ? '2' : n;
+    return 'WB' + digit;
+  }
+
+  // "poster [name]" — keep as "Poster: [Name]"
+  const posterMatch = s.match(/^poster[s]?\s*(?:named?\s+|called?\s+)?(.+)$/i);
+  if (posterMatch) {
+    const name = posterMatch[1].trim().replace(/\w/g, c => c.toUpperCase());
+    return 'Poster: ' + name;
+  }
+
+  // Plain digit
+  if (/^\d+$/.test(s)) return s;
+
+  // Fallback — return as-is (user typed something custom)
+  return s;
+}
+
+// ── BOOK EXTRACTOR — scans text for book/workbook/poster mentions ──
+function extractBook(text) {
+  // "workbook 1", "workbook 2", "WB1", "WB 2"
+  const wbMatch = text.match(/(?:workbook|work\s+book|WB)\s*([12]|one|two)/i);
+  if (wbMatch) {
+    const n = wbMatch[1].toLowerCase();
+    return 'WB' + (n === 'one' ? '1' : n === 'two' ? '2' : n);
+  }
+
+  // "poster [name]" — name runs until next field label or end
+  const posterMatch = text.match(/poster[s]?\s+(?:named?\s+|called?\s+)?(.+?)(?=\s*,?\s*(?:page\s+\d|keyword|note|category)|$)/i);
+  if (posterMatch) {
+    const name = posterMatch[1].trim().replace(/[.,;]+$/, '').replace(/\w/g, c => c.toUpperCase());
+    return 'Poster: ' + name;
+  }
+
+  // Plain "book [digit]"
+  const bookNum = extractNumber(text, 'book') || extractNumber(text, 'volume') || extractNumber(text, 'vol');
+  if (bookNum) return bookNum;
+
+  return null;
+}
+
+// ── LOCAL PARSER — fully order-independent ──
+// Each field is extracted by its label keyword, stopping at any other label keyword.
+// Fields can appear in any order; unmentioned fields stay blank (or use remembered values).
+function parseEntry(text) {
+  try {
+    const t = text.trim();
+
+
+
+    // ── BOOK ── digit, WB1/WB2 (workbook), or poster name
+    let book = lastBook;
+    const bookVal = extractBook(t);
+    if (bookVal) book = bookVal;
+
+    // ── PAGE ── numbers only, use last if not mentioned
+    let page = lastPage;
+    const pageNum = extractNumber(t, 'page');
+    if (pageNum) page = pageNum;
+
+    // Field stop boundaries are inline in each field's regex below
+
+    // ── CATEGORY ── any order
+    let category = '';
+    const catMatch = t.match(/\bcategor(?:y|ies)\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|keyword\b|abbreviation\b|abbr\b|page\s+name\b|section\s+name\b|source\s+type\b|(?:book|volume)\s+\d|page\s+\d)|$)/i);
+    if (catMatch) category = matchCategory(catMatch[1].trim().replace(/[.,;]+$/, ''));
+
+    // ── KEYWORD ── any order
+    let keyword = '';
+    const kwMatch = t.match(/\bkeyword[s]?\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|notes\b|categor(?:y|ies)\b|abbreviation\b|abbr\b|page\s+name\b|section\s+name\b|source\s+type\b|(?:book|volume)\s+\d|page\s+\d)|$)/i);
+    if (kwMatch) keyword = fixTechnicalString(kwMatch[1].trim().replace(/[.,;]+$/, ''), category);
+
+    // ── ABBREVIATION ── only used for acronyms
+    let abbr = '';
+    const abbrMatch = t.match(/\b(?:abbreviation|abbreviates?\s+to|abbr|acronym\s+is)\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|keyword\b|categor(?:y|ies)\b|section\b|chapter\b|source\s+type\b|(?:book|volume)\s+\d|page\b)|$)/i);
+    if (abbrMatch) {
+      let rawAbbr = abbrMatch[1].trim().replace(/[.,;]+$/, '');
+      const tokens = rawAbbr.split(/\s+/);
+      if (tokens.every(tok => tok.length === 1)) {
+        abbr = tokens.join('').toUpperCase();
+      } else {
+        abbr = normalizeSymbols(rawAbbr).toUpperCase().replace(/\s+/g, '');
+      }
+    }
+
+    // ── PAGE NAME ── triggered by "page name [x]"; auto-filled from map if not spoken
+    let pageName = '';
+    const pageNameMatch = t.match(/\bpage\s+name\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|keyword\b|categor(?:y|ies)\b|abbreviation\b|abbr\b|section\s+name\b|source\s+type\b|(?:book|volume)\s+\d|page\s+\d)|$)/i);
+    if (pageNameMatch) {
+      pageName = pageNameMatch[1].trim().replace(/[.,;]+$/, '');
+      // Update the map immediately so it persists for subsequent entries on this page
+      const pk = book + ':' + page;
+      if (pageName && pk !== ':') pageNameMap[pk] = pageName;
+    } else {
+      // Not spoken — look up from map
+      const pk = book + ':' + page;
+      pageName = pageNameMap[pk] || '';
+    }
+
+    // ── SECTION NAME ── triggered only by exact phrase "section name"
+    let sectionName = '';
+    const sectionNameMatch = t.match(/\bsection\s+name\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|keyword\b|categor(?:y|ies)\b|abbreviation\b|abbr\b|page\s+name\b|source\s+type\b|(?:book|volume)\s+\d|page\s+\d)|$)/i);
+    if (sectionNameMatch) sectionName = sectionNameMatch[1].trim().replace(/[.,;]+$/, '');
+
+    // ── SOURCE TYPE ── "slide", "text", "source type [x]"
+    // Only match "slide"/"text" when used as a standalone label, not inside a sentence
+    let sourceType = '';
+    const srcMatch = t.match(/\b(?:source\s+type|source)\s+(?:is\s+)?(.+?)(?=\s*,?\s*(?:note\b|keyword\b|categor(?:y|ies)\b|section\b|(?:book|volume)\s+\d|page\b)|$)/i);
+    // "slide" or "text" as a standalone word (preceded by comma/start, not mid-sentence)
+    const slideMatch = t.match(/(?:^|,\s*)\s*\b(slide|text)\b\s*(?:,|$)/i);
+    if (srcMatch) {
+      sourceType = srcMatch[1].trim().replace(/[.,;]+$/, '');
+    } else if (slideMatch) {
+      const raw = slideMatch[1].toLowerCase();
+      sourceType = raw.includes('slide') ? 'Slide' : 'Text';
+    }
+
+    // ── NOTE ── any order — stops ONLY at field labels, never at natural words like "text" or "slide"
+    let note = '';
+    const noteMatch = t.match(/\bnote[s]?\s+(?:is\s+|are\s+)?(.+?)(?=\s*,?\s*(?:categor(?:y|ies)\b|keyword\b|abbreviation\b|abbr\b|page\s+name\b|section\s+name\b|source\s+type\b|(?:book|volume)\s+\d|page\s+\d)|$)/i);
+    if (noteMatch) note = applyCyberTerms(noteMatch[1].trim().replace(/[.,;]+$/, ''));
+
+    // Fallback keyword: bare term between commas before a label
+    if (!keyword) {
+      const fallback = t.match(/,\s*(.+?)\s*,\s*(?:note|category|section)/i);
+      if (fallback) keyword = fixTechnicalString(fallback[1].trim(), category);
+    }
+
+    // ── ACRONYM AUTO-LOGIC ──
+    // Always auto-fill both keyword and abbreviation. User can correct either with change commands.
+    // Cases:
+    //   keyword is a phrase → keyword stays as full phrase (title-cased), abbr derived from initials
+    //   keyword looks like initials (all caps, short) → abbr = those initials, keyword = initials too
+    //     (user will likely say "change keyword to [full phrase]" — abbr already set)
+    //   explicit abbr spoken alongside phrase keyword → use both as-is
+    const FILLERS = new Set(['a','an','the','of','and','or','for','in','to','with','by','at','on','is','are','yet','another','ridiculous','recursive','not']);
+
+    if (category === 'Acronym' && keyword) {
+      const isInitials = /^[A-Z0-9&+]{2,12}$/.test(keyword.replace(/[-_\s]/g,''));
+      const words = keyword.trim().split(/\s+/);
+      const isPhrase = words.length >= 2;
+
+      if (isPhrase) {
+        // Full phrase spoken — title-case it, derive abbr from significant words
+        keyword = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        if (!abbr) {
+          abbr = words
+            .map(w => w.toLowerCase())
+            .filter(w => !FILLERS.has(w))
+            .map(w => w[0].toUpperCase())
+            .join('');
+        }
+      } else if (isInitials) {
+        // Short initials spoken — use as abbr, also set as keyword so both fields are filled
+        // User can say "change keyword to [full phrase]" to expand it
+        abbr = keyword.toUpperCase();
+        keyword = abbr; // show in keyword too so it's not blank — user corrects if desired
+      } else {
+        // Single word that's not clearly initials — title-case it, derive abbr if not set
+        keyword = keyword.charAt(0).toUpperCase() + keyword.slice(1).toLowerCase();
+        if (!abbr) abbr = keyword.charAt(0).toUpperCase();
+      }
+    }
+
+    // ── OVERFLOW DETECTION ──
+    // Page name and section name should be short labels (≤5 words).
+    // If either is long and the note is empty, the user almost certainly forgot
+    // to say "note" after the label and just kept talking.
+    // Split at word 4: first 3 words stay as the label, the rest becomes the note.
+    const PAGE_NAME_WORD_LIMIT = 4;
+    const SECTION_NAME_WORD_LIMIT = 4;
+
+    if (pageName && !note) {
+      const pnWords = pageName.trim().split(/\s+/);
+      if (pnWords.length > PAGE_NAME_WORD_LIMIT) {
+        note = applyCyberTerms(pnWords.slice(PAGE_NAME_WORD_LIMIT - 1).join(' '));
+        pageName = pnWords.slice(0, PAGE_NAME_WORD_LIMIT - 1).join(' ');
+        setParseStatus('⚠ Long page name split — check note field', 'thinking');
+      }
+    }
+
+    if (sectionName && !note) {
+      const snWords = sectionName.trim().split(/\s+/);
+      if (snWords.length > SECTION_NAME_WORD_LIMIT) {
+        note = applyCyberTerms(snWords.slice(SECTION_NAME_WORD_LIMIT - 1).join(' '));
+        sectionName = snWords.slice(0, SECTION_NAME_WORD_LIMIT - 1).join(' ');
+        setParseStatus('⚠ Long section name split — check note field', 'thinking');
+      }
+    }
+
+    // Also: if keyword is very long (>6 words) and note is empty,
+    // assume the tail is the note
+    if (keyword && !note) {
+      const kwWords = keyword.trim().split(/\s+/);
+      if (kwWords.length > 6) {
+        note = applyCyberTerms(kwWords.slice(5).join(' '));
+        keyword = fixTechnicalString(kwWords.slice(0, 5).join(' '), category);
+        setParseStatus('⚠ Long keyword split — check note field', 'thinking');
+      }
+    }
+
+    document.getElementById('f-book').value = book;
+    document.getElementById('f-page').value = String(page).replace(/\D/g, '');
+    document.getElementById('f-keyword').value = keyword;
+    document.getElementById('f-note').value = note;
+    document.getElementById('f-category').value = category;
+    document.getElementById('f-abbr').value = abbr;
+    document.getElementById('f-page-name').value = pageName;
+    document.getElementById('f-section-name').value = sectionName;
+    document.getElementById('f-source-type').value = sourceType;
+
+    hideThinking();
+    if (keyword || page) {
+      // Only overwrite the status if no overflow warning is already showing
+      const currentStatus = document.getElementById('parse-status');
+      if (!currentStatus || !currentStatus.classList.contains('thinking')) {
+        setParseStatus('✓ Review fields — say "add to index" to confirm', 'success');
+      }
+    }
+  } catch (err) {
+    hideThinking();
+    setParseStatus('Parse error: ' + err.message, 'error');
+  }
+}
+
+// ── TECHNICAL STRING FIXER ──
+// Reconstructs things like "S T L dot exe" → "STL.exe"
+// "S V C host dot exe" → "svchost.exe"
+// "H K L M" → "HKLM"
+// "dot net" → ".NET"
+// ── CYBERSECURITY TERM CORRECTION TABLE ──
+// Maps phonetic / misheard spoken forms → correct technical spelling
+// Checked AFTER symbol normalization, BEFORE category formatting
+const CYBER_TERMS = [
+  // Frameworks & Standards
+  [/\bmiter\s*at+[&\s]*c+k\b/gi,          'MITRE ATT&CK'],
+  [/\bmitre\s*at+[&\s]*c+k\b/gi,          'MITRE ATT&CK'],
+  [/\bmiter\s+attack\s+framework\b/gi,    'MITRE ATT&CK Framework'],
+  [/\bmitre\s+attack\s+framework\b/gi,    'MITRE ATT&CK Framework'],
+  [/\bnist\b/gi,                            'NIST'],
+  [/\bnist\s+csf\b/gi,                     'NIST CSF'],
+  [/\bcvss\b/gi,                            'CVSS'],
+  [/\bcve\b/gi,                             'CVE'],
+  [/\bcwe\b/gi,                             'CWE'],
+  [/\bcap+ec\b/gi,                          'CAPEC'],
+  [/\bstix\b/gi,                            'STIX'],
+  [/\btaxi+i\b/gi,                          'TAXII'],
+  [/\bopenioc\b/gi,                         'OpenIOC'],
+  [/\byara\b/gi,                            'YARA'],
+  [/\bsnort\b/gi,                           'Snort'],
+  [/\bsuricata\b/gi,                        'Suricata'],
+  [/\bzeek\b/gi,                            'Zeek'],
+  [/\bbro\s+ids\b/gi,                      'Bro IDS'],
+  [/\bsigma\s+rule/gi,                      'Sigma rule'],
+  // Malware families & types
+  [/\bwana\s*cry\b/gi,                     'WannaCry'],
+  [/\bnotpetya\b/gi,                        'NotPetya'],
+  [/\bpetya\b/gi,                           'Petya'],
+  [/\bstuxnet\b/gi,                         'Stuxnet'],
+  [/\bemo+tet\b/gi,                         'Emotet'],
+  [/\btrick\s*bot\b/gi,                    'TrickBot'],
+  [/\bry[uo]k\b/gi,                         'Ryuk'],
+  [/\bconti\b/gi,                           'Conti'],
+  [/\bblack\s*cat\b/gi,                    'BlackCat'],
+  [/\blockbit\b/gi,                         'LockBit'],
+  [/\bdark\s*side\b/gi,                    'DarkSide'],
+  [/\brev[ie]l\b/gi,                        'REvil'],
+  [/\bmirai\b/gi,                           'Mirai'],
+  [/\bze[ou]s\b/gi,                         'Zeus'],
+  [/\bspy\s*eye\b/gi,                      'SpyEye'],
+  [/\bblack\s*energy\b/gi,                 'BlackEnergy'],
+  [/\bindustroyer\b/gi,                     'Industroyer'],
+  [/\btri[ck]*ton\b/gi,                     'TRITON'],
+  [/\bflame\s+malware\b/gi,                'Flame'],
+  [/\bdust[ae]r\b/gi,                       'Duqu'],
+  // Exploit techniques
+  [/\bbuffer\s+over\s*flow\b/gi,          'buffer overflow'],
+  [/\bstack\s+smash/gi,                     'stack smashing'],
+  [/\bheap\s+spray/gi,                      'heap spray'],
+  [/\buse\s+after\s+free\b/gi,            'use-after-free'],
+  [/\bret[uo]rn\s+oriented\s+prog/gi,     'ROP'],
+  [/\br[- ]?o[- ]?p\b/gi,                  'ROP'],
+  [/\bshell\s*code\b/gi,                   'shellcode'],
+  [/\bsql\s+inject/gi,                      'SQL injection'],
+  [/\bx[- ]?s[- ]?s\b/gi,                  'XSS'],
+  [/\bcross\s+site\s+script/gi,            'XSS'],
+  [/\bx[- ]?s[- ]?r[- ]?f\b/gi,            'CSRF'],
+  [/\bssl?[- ]?strip/gi,                     'SSL stripping'],
+  [/\bman\s+in\s+the\s+middle\b/gi,     'MITM'],
+  [/\bm[- ]?i[- ]?t[- ]?m\b/gi,            'MITM'],
+  [/\bpass\s+the\s+hash\b/gi,             'pass-the-hash'],
+  [/\bpass\s+the\s+ticket\b/gi,           'pass-the-ticket'],
+  [/\bgolden\s+ticket\b/gi,                'Golden Ticket'],
+  [/\bsilver\s+ticket\b/gi,                'Silver Ticket'],
+  [/\bkerbero+[sz]ting\b/gi,               'Kerberoasting'],
+  [/\bas[- ]?rep\s+roast/gi,               'AS-REP Roasting'],
+  [/\bdcsinc\b/gi,                          'DCSync'],
+  [/\bdc\s+sync\b/gi,                      'DCSync'],
+  // Windows internals & artifacts
+  [/\bregistry\s+hive\b/gi,               'registry hive'],
+  [/\bsam\s+(?:database|file|hive)\b/gi,  'SAM database'],
+  [/\bnts?ds?[\s.]dit\b/gi,               'NTDS.dit'],
+  [/\bntds\b/gi,                            'NTDS'],
+  [/\blsa+s\b/gi,                           'LSASS'],
+  [/\bl[- ]?s[- ]?a[- ]?s[- ]?s?\b/gi,    'LSASS'],
+  [/\bwindows\s+event\s+log/gi,            'Windows Event Log'],
+  [/\bevt[xr]\b/gi,                         'EVTX'],
+  [/\bprefetch\b/gi,                        'Prefetch'],
+  [/\bjump\s*list[s]?\b/gi,               'Jump Lists'],
+  [/\bshim\s+cache\b/gi,                   'ShimCache'],
+  [/\bam\s*cache\b/gi,                     'AmCache'],
+  [/\buser\s*assist\b/gi,                  'UserAssist'],
+  [/\bmft\b/gi,                             'MFT'],
+  [/\bmaster\s+file\s+table\b/gi,        'MFT'],
+  [/\busn\s+journal\b/gi,                  'USN Journal'],
+  [/\blnk\s+file/gi,                        'LNK file'],
+  [/\bvs[sz]\b/gi,                          'VSS'],
+  [/\bvolume\s+shadow\s+cop/gi,            'VSS'],
+  [/\bwmi\b/gi,                             'WMI'],
+  [/\bcom\s+object/gi,                      'COM object'],
+  [/\bdll\s+hijack/gi,                      'DLL hijacking'],
+  [/\bdll\s+inject/gi,                      'DLL injection'],
+  [/\bprocess\s+hollow/gi,                  'process hollowing'],
+  [/\bprocess\s+inject/gi,                  'process injection'],
+  [/\batom\s+bomb/gi,                       'AtomBombing'],
+  // Network & protocols
+  [/\bdns\b/gi,                             'DNS'],
+  [/\bdhcp\b/gi,                            'DHCP'],
+  [/\bsmb\b/gi,                             'SMB'],
+  [/\brdp\b/gi,                             'RDP'],
+  [/\bssh\b/gi,                             'SSH'],
+  [/\bftp\b/gi,                             'FTP'],
+  [/\bhttp[s]?\b/gi,                        (m) => m.toUpperCase()],
+  [/\bicmp\b/gi,                            'ICMP'],
+  [/\barp\b/gi,                             'ARP'],
+  [/\bnat\b/gi,                             'NAT'],
+  [/\bvpn\b/gi,                             'VPN'],
+  [/\btls\b/gi,                             'TLS'],
+  [/\bssl\b/gi,                             'SSL'],
+  [/\bipv6\b/gi,                            'IPv6'],
+  [/\bipv4\b/gi,                            'IPv4'],
+  // Tools
+  [/\bwire\s*shark\b/gi,                   'Wireshark'],
+  [/\bmetasploit\b/gi,                      'Metasploit'],
+  [/\bmimikatz\b/gi,                        'Mimikatz'],
+  [/\bcob[ao]lt\s+strike\b/gi,            'Cobalt Strike'],
+  [/\bblood\s*hound\b/gi,                  'BloodHound'],
+  [/\bsharp\s*hound\b/gi,                  'SharpHound'],
+  [/\bnmap\b/gi,                            'Nmap'],
+  [/\bburp\s+suite\b/gi,                   'Burp Suite'],
+  [/\bida\s+pro\b/gi,                      'IDA Pro'],
+  [/\bghost\s*pack\b/gi,                   'GhostPack'],
+  [/\brubeus\b/gi,                          'Rubeus'],
+  [/\bimpacket\b/gi,                        'Impacket'],
+  [/\bpower\s*sploit\b/gi,                 'PowerSploit'],
+  [/\bpower\s*shell\b/gi,                  'PowerShell'],
+  [/\bpower\s*shell\s+empire\b/gi,       'PowerShell Empire'],
+  [/\bvola?tility\b/gi,                     'Volatility'],
+  [/\bautoruns\b/gi,                        'Autoruns'],
+  [/\bsysmon\b/gi,                          'Sysmon'],
+  [/\bproc\s*mon\b/gi,                     'ProcMon'],
+  [/\bproc\s*exp\b/gi,                     'ProcExp'],
+  [/\bftkimager\b/gi,                       'FTK Imager'],
+  [/\bftk\s+imager\b/gi,                   'FTK Imager'],
+  [/\bautopsy\b/gi,                         'Autopsy'],
+  [/\bx32dbg\b/gi,                          'x32dbg'],
+  [/\bx64dbg\b/gi,                          'x64dbg'],
+  [/\bolly\s*dbg\b/gi,                     'OllyDbg'],
+  // Concepts & acronyms
+  [/\bioc[s]?\b/gi,                         'IOC'],
+  [/\btti?p[s]?\b/gi,                       'TTP'],
+  [/\btti?ps\b/gi,                          'TTPs'],
+  [/\bapt\b/gi,                             'APT'],
+  [/\bioc\b/gi,                             'IOC'],
+  [/\bsoc\b/gi,                             'SOC'],
+  [/\bsiem\b/gi,                            'SIEM'],
+  [/\bedr\b/gi,                             'EDR'],
+  [/\bxdr\b/gi,                             'XDR'],
+  [/\bngfw\b/gi,                            'NGFW'],
+  [/\bids\b/gi,                             'IDS'],
+  [/\bips\b/gi,                             'IPS'],
+  [/\bdlp\b/gi,                             'DLP'],
+  [/\bcas[bp]\b/gi,                         'CASB'],
+  [/\bzero\s+trust\b/gi,                   'Zero Trust'],
+  [/\blateral\s+move/gi,                    'lateral movement'],
+  [/\bpersistence\s+mech/gi,               'persistence mechanism'],
+  [/\bcommand\s+and\s+control\b/gi,      'C2'],
+  [/\bc\s*(?:and|&|n)\s*c\b/gi,          'C2'],
+  [/\bexfiltration\b/gi,                    'exfiltration'],
+  [/\bpivoting\b/gi,                        'pivoting'],
+  [/\bread\s+team/gi,                       'red team'],
+  [/\bblue\s+team/gi,                       'blue team'],
+  [/\bpurple\s+team/gi,                     'purple team'],
+  [/\bthreat\s+hunt/gi,                     'threat hunting'],
+  [/\bincident\s+response\b/gi,           'IR'],
+  [/\bdigital\s+forensics\b/gi,           'DFIR'],
+  [/\bd[- ]?f[- ]?i[- ]?r\b/gi,            'DFIR'],
+  // Windows commands & paths
+  [/\bip\s*config\b/gi,                    'ipconfig'],
+  [/\bnet\s+stat\b/gi,                     'netstat'],
+  [/\btask\s*list\b/gi,                    'tasklist'],
+  [/\btask\s*kill\b/gi,                    'taskkill'],
+  [/\bwho\s*ami\b/gi,                      'whoami'],
+  [/\bnet\s+use\b/gi,                      'net use'],
+  [/\bnet\s+user\b/gi,                     'net user'],
+  [/\breg\s+query\b/gi,                    'reg query'],
+  [/\bsc\s+query\b/gi,                     'sc query'],
+  [/\bwmic\b/gi,                            'wmic'],
+  [/\bcmd\s+\/?c\b/gi,                    'cmd /c'],
+  [/\bpower\s*shell\s+\-\s*exec/gi,     'powershell -exec'],
+  [/\bhklm\b/gi,                            'HKLM'],
+  [/\bhkcu\b/gi,                            'HKCU'],
+  [/\bhkcr\b/gi,                            'HKCR'],
+  [/\bhku\b/gi,                             'HKU'],
+  [/\bsystem32\b/gi,                        'System32'],
+  [/\bsys\s*wow\s*64\b/gi,               'SysWOW64'],
+  [/\bappdata\b/gi,                         'AppData'],
+  [/\btemp\s+folder\b/gi,                  '%TEMP%'],
+  [/\bwindows\s+temp\b/gi,                 '%TEMP%'],
+];
+
+function applyCyberTerms(str) {
+  let s = str;
+  for (const [pattern, replacement] of CYBER_TERMS) {
+    s = s.replace(pattern, replacement);
+  }
+  return s;
+}
+
+// ── SPOKEN SYMBOL NORMALIZER (applied to all keywords first) ──
+// ── SPOKEN PUNCTUATION — for free-text fields (note, page name, section name) ──
+// Converts spoken punctuation words into their character equivalents.
+// Applied BEFORE stripping trailing punct so spoken periods/commas are preserved.
+function normalizePunctuation(s) {
+  // "period space" or "full stop space" → ". " (end sentence, start new one)
+  s = s.replace(/(?:period|full\s+stop)\s+space/gi, '. ');
+  // "next line" or "new line" → line break
+  s = s.replace(/(?:next|new)\s+line/gi, '\n');
+  // "comma" → ","  — but NOT inside known technical terms (handled by caller context)
+  s = s.replace(/comma/gi, ',');
+  // "period" or "full stop" alone (not followed by "space" — already handled above)
+  s = s.replace(/(?:period|full\s+stop)/gi, '.');
+  // "dash" and "hyphen" → "-"  (also in normalizeSymbols for technical strings)
+  s = s.replace(/\s*(?:dash|hyphen)\s*/gi, '-');
+  // Capitalise letter after ". " (new sentence)
+  s = s.replace(/\.\s+([a-z])/g, (_, c) => '. ' + c.toUpperCase());
+  return s;
+}
+
+function normalizeSymbols(s) {
+  s = s.replace(/\s*dot\s*(exe|dll|bat|sys|com|net|ini|log|cfg|tmp|ps1|vbs|sh|py|js|reg|msi|inf|drv)/gi,
+    (_, ext) => '.' + ext.toLowerCase());
+  s = s.replace(/\s+dot\s+/gi, '.');
+  s = s.replace(/\s*(?:dash|hyphen)\s*/gi, '-');
+  s = s.replace(/\s*underscore\s*/gi, '_');
+  s = s.replace(/\s*backslash\s*/gi, '\\');
+  s = s.replace(/\s*forward\s+slash\s*/gi, '/');
+  s = s.replace(/\s*slash\s*/gi, '/');
+  s = s.replace(/\s*colon\s*/gi, ':');
+  s = s.replace(/\s+at\s+/gi, '@');
+  // NOTE: single-letter collapsing ("H K L M" → "HKLM") is intentionally NOT done here.
+  // For Acronym category entries, the full phrase must be preserved as the keyword.
+  // Collapsing is only applied for non-Acronym categories via fixTechnicalString.
+  return s.trim();
+}
+
+// ── CATEGORY-AWARE KEYWORD FORMATTER ──
+// Matches spoken category to known ones, then formats keyword accordingly
+const KNOWN_CATS = ['Command', 'Acronym', 'Tool', 'Filename', 'Malware'];
+
+function matchCategory(str) {
+  if (!str) return str;
+  // Strip commas injected by speech recognition (e.g. "network, forensics" → "network forensics")
+  str = str.replace(/,/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const lower = str.toLowerCase().trim();
+  // "review this" / "mark for review" → special Review category
+  if (/^(?:review(?:\s+this)?|mark\s+(?:for\s+)?review|flag)$/.test(lower)) return 'Review This';
+  // Check built-in categories — exact word match only, not substring
+  for (const cat of KNOWN_CATS) {
+    const re = new RegExp('(?:^|\\b)' + cat.toLowerCase() + '(?:\\b|$)');
+    if (re.test(lower)) return cat;
+  }
+  // Check custom categories — exact word match
+  for (const cat of customCategories) {
+    const re = new RegExp('(?:^|\\b)' + cat.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\b|$)');
+    if (re.test(lower)) return cat;
+  }
+  // Unknown — title-case each word, treat as custom
+  const formatted = str.trim().toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase());
+  if (!customCategories.includes(formatted) && !KNOWN_CATS.includes(formatted)) {
+    customCategories.push(formatted);
+  }
+  return formatted;
+}
+
+function formatKeywordForCategory(kw, category) {
+  let s = normalizeSymbols(kw);
+
+  switch (category) {
+
+    case 'Command':
+      // Commands are typically uppercase (NET USE, IPCONFIG, etc.)
+      // Preserve flags: /flag and -flag stay intact
+      // e.g. "net use" → "NET USE", "ipconfig slash all" → "IPCONFIG /all"
+      s = s.replace(/([a-zA-Z0-9]+)/g, (word) => {
+        // Don't uppercase flag values after / or -
+        return word.toUpperCase();
+      });
+      // flags should be lowercase after the slash
+      s = s.replace(/(\/|-)([A-Z]+)/g, (_, sym, flag) => sym + flag.toLowerCase());
+      break;
+
+    case 'Acronym':
+      // Keyword = the full spelled-out phrase, Title Cased
+      // Abbreviation is handled separately in the auto-logic block in parseEntry
+      // Just title-case each word here — do NOT collapse to initials
+      s = s.replace(/\b\w/g, c => c.toUpperCase());
+      break;
+
+    case 'Tool':
+      // Tools: Title Case, preserve extensions as-is
+      // "process monitor" → "Process Monitor", "wire shark" → "Wireshark"
+      // Common tool name fusions
+      const toolFusions = {
+        'wire shark': 'Wireshark', 'wireshark': 'Wireshark',
+        'process monitor': 'Process Monitor', 'procmon': 'ProcMon',
+        'process explorer': 'Process Explorer', 'procexp': 'ProcExp',
+        'auto runs': 'Autoruns', 'autoruns': 'Autoruns',
+        'net cat': 'Netcat', 'netcat': 'Netcat',
+        'nmap': 'Nmap', 'burp suite': 'Burp Suite',
+        'ida pro': 'IDA Pro', 'ida': 'IDA',
+        'olly dbg': 'OllyDbg', 'ollydbg': 'OllyDbg',
+        'immunity debugger': 'Immunity Debugger',
+        'metasploit': 'Metasploit', 'volatility': 'Volatility',
+        'power shell': 'PowerShell', 'powershell': 'PowerShell',
+        'task manager': 'Task Manager',
+        'regedit': 'Regedit', 'reg edit': 'Regedit',
+      };
+      const lower_s = s.toLowerCase();
+      if (toolFusions[lower_s]) {
+        s = toolFusions[lower_s];
+      } else {
+        // Title case
+        s = s.replace(/\b\w/g, c => c.toUpperCase());
+      }
+      break;
+
+    case 'Filename':
+      // Filenames: lowercase base, lowercase extension
+      // "hosts file" → "hosts", "S A M" → "SAM"
+      // strip the word "file" if it trails
+      s = s.replace(/\s+file$/i, '');
+      // if no extension present, leave as-is but lowercase
+      if (!s.includes('.')) {
+        s = s.toLowerCase();
+      } else {
+        // lowercase everything
+        s = s.toLowerCase();
+      }
+      break;
+
+    case 'Malware':
+      // Malware names: preserve mixed case, ensure .exe/.dll extension is lowercase
+      // Common pattern: "Zeus", "WannaCry", "svchost.exe"
+      // Capitalize first letter if all lowercase and no extension
+      s = s.replace(/\.(EXE|DLL|BAT|SYS|VBS|PS1)/g, ext => ext.toLowerCase());
+      if (!s.includes('.') && s === s.toLowerCase() && s.length > 2) {
+        s = s.charAt(0).toUpperCase() + s.slice(1);
+      }
+      break;
+
+    default:
+      // Unknown category — just normalize symbols, leave case alone
+      break;
+  }
+
+  return s.trim();
+}
+
+function collapseSpacedLetters(s) {
+  // "H K L M" → "HKLM", "s v c h o s t" → "svchost", "S V C host" → "SVChost"
+  s = s.replace(/\b([A-Z]\s){2,}[A-Z]\b/g, m => m.replace(/\s/g, ''));
+  s = s.replace(/\b([a-z] ){2,}[a-z]\b/g, m => m.replace(/\s/g, ''));
+  s = s.replace(/\b((?:[A-Za-z] ){1,6})([A-Za-z]{2,})\b/g, (match, singles, word) => {
+    return singles.replace(/\s/g, '') + word;
+  });
+  return s;
+}
+
+function fixTechnicalString(str, category) {
+  // Apply cyber term corrections first on raw spoken string
+  let corrected = applyCyberTerms(str);
+  if (category === 'Acronym') {
+    // For acronyms: preserve full phrase, just normalize symbols but do NOT collapse letters
+    return formatKeywordForCategory(normalizeSymbols(corrected), category);
+  }
+  if (category) {
+    // For all other categories: collapse spaced letters then format
+    return formatKeywordForCategory(collapseSpacedLetters(normalizeSymbols(corrected)), category);
+  }
+  return collapseSpacedLetters(normalizeSymbols(corrected));
+}
+
+// ── NOTE VALUE PROCESSOR ──
+// Applies spoken punctuation then cyber term corrections for note field values
+function processNoteVal(raw) {
+  return applyCyberTerms(normalizePunctuation(raw));
+}
+
+// ── ENTRIES ──
+function addManualEntry(silent) {
+  const book = normalizeBook(document.getElementById('f-book').value.trim()) || lastBook;
+  const page = document.getElementById('f-page').value.trim().replace(/\D/g, '');
+  const keyword = document.getElementById('f-keyword').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+  const category = document.getElementById('f-category').value.trim();
+  const abbr = document.getElementById('f-abbr').value.trim();
+  const pageName = document.getElementById('f-page-name').value.trim();
+  const sectionName = document.getElementById('f-section-name').value.trim();
+  const sourceType = document.getElementById('f-source-type').value.trim();
+
+  if (!keyword && !abbr) { toast('Please enter a keyword.'); return; }
+
+  lastBook = book; // remember for next entry
+  if (page) lastPage = page;
+
+  // Store page name in map if provided; look up from map if not
+  const pageKey = book + ':' + page;
+  if (pageName) {
+    pageNameMap[pageKey] = pageName; // save/update
+  }
+  const resolvedPageName = pageName || pageNameMap[pageKey] || '';
+
+  const entry = { id: ++entryId, book, page, keyword, abbr, note, category, pageName: resolvedPageName, sectionName, sourceType };
+  entries.push(entry);
+  renderRow(entry);
+  updateCount();
+  saveIndex();
+  updateUndoBtn();
+  entriesSinceExport += 1;
+  if (entriesSinceExport >= AUTO_EXPORT_ENTRIES) {
+    autoExport('10 entries');
+  }
+  clearForm();
+  setParseStatus('', '');
+  toast('✓ Saved: ' + keyword);
+}
+
+function renderRow(entry) {
+  const tbody = document.getElementById('index-body');
+  const emptyRow = document.getElementById('empty-row');
+  if (emptyRow) emptyRow.remove();
+
+  const tr = document.createElement('tr');
+  tr.id = 'row-' + entry.id;
+  tr.innerHTML = `
+    <td class="td-book">${esc(entry.book)}</td>
+    <td class="td-page">${esc(entry.page)}</td>
+    <td class="td-kw">${esc(entry.keyword)}</td>
+    <td class="td-note" style="font-style:normal;color:var(--accent);font-size:0.72rem;font-weight:700">${esc(entry.abbr||'')}</td>
+    <td class="td-note" style="font-style:normal;color:var(--text);font-size:0.72rem">${esc(entry.pageName||'')}</td>
+    <td class="td-note" style="font-style:normal;color:var(--text);font-size:0.72rem">${esc(entry.sectionName||'')}</td>
+    <td class="td-note" style="font-style:normal;color:var(--accent2);font-size:0.72rem">${esc(entry.sourceType||'')}</td>
+    <td class="td-note" style="color:var(--accent2)">${esc(entry.category)}</td>
+    <td class="td-note">${esc(entry.note)}</td>
+    <td><button class="del-btn" onclick="deleteEntry(${entry.id})" title="Delete">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  const row = document.getElementById('row-' + id);
+  if (row) row.remove();
+  updateCount();
+  saveIndex();
+  if (entries.length === 0) showEmpty();
+}
+
+function showEmpty() {
+  const tbody = document.getElementById('index-body');
+  tbody.innerHTML = `<tr id="empty-row"><td colspan="10"><div class="empty-state">No entries yet.<br>Start speaking or add manually.</div></td></tr>`;
+}
+
+function updateCount() {
+  document.getElementById('entry-count').textContent = entries.length + ' entr' + (entries.length === 1 ? 'y' : 'ies');
+}
+
+// ── FIELD OVERWRITE HELPER ──
+// If newChunk begins with a field label that already exists in entryBuffer,
+// remove the old value for that field before appending the new chunk.
+// This prevents duplicate field values accumulating in the buffer.
+const FIELD_PATTERNS = [
+  { label: /^keyword[s]?\s/i,       strip: /\bkeyword[s]?\s+(?:is\s+)?[^]*?(?=\s*(?:note|category|abbreviation|abbr|page\s+name|section\s+name|source|page\s+\d|$))/i },
+  { label: /^categor(?:y|ies)\s/i,  strip: /\bcategor(?:y|ies)\s+(?:is\s+)?[^]*?(?=\s*(?:note|keyword|abbreviation|abbr|page\s+name|section\s+name|source|page\s+\d|$))/i },
+  { label: /^note[s]?\s/i,          strip: /\bnote[s]?\s+(?:is\s+|are\s+)?[^]*?(?=\s*(?:keyword|category|abbreviation|abbr|page\s+name|section\s+name|source|page\s+\d|$))/i },
+  { label: /^abbreviation\s/i,      strip: /\b(?:abbreviation|abbr)\s+(?:is\s+)?\S+/i },
+  { label: /^abbr\s/i,              strip: /\b(?:abbreviation|abbr)\s+(?:is\s+)?\S+/i },
+  { label: /^page\s+name\b/i,      strip: /\bpage\s+name\s+(?:is\s+)?[^]*?(?=\s*(?:note|keyword|category|section\s+name|source|page\s+\d|$))/i },
+  { label: /^section\s+name\b/i,   strip: /\bsection\s+name\s+(?:is\s+)?[^]*?(?=\s*(?:note|keyword|category|page\s+name|source|page\s+\d|$))/i },
+  { label: /^source(?:\s+type)?\s/i, strip: /\bsource(?:\s+type)?\s+(?:is\s+)?\S+/i },
+  { label: /^slide$/i,               strip: /\bslide\b/i },
+  { label: /^text$/i,                strip: /\btext\b/i },
+];
+
+function overwriteFieldInBuffer(buffer, newChunk) {
+  const chunkLower = newChunk.trim().toLowerCase();
+  for (const {label, strip} of FIELD_PATTERNS) {
+    if (label.test(newChunk.trim())) {
+      // This chunk starts with a known field label — remove prior occurrence from buffer
+      const stripped = buffer.replace(strip, '').replace(/\s{2,}/g, ' ').trim();
+      return stripped + ' ' + newChunk;
+    }
+  }
+  // No match — plain append
+  return buffer + ' ' + newChunk;
+}
+
+// ── CHANGE COMMAND DISPATCHER ──
+// Returns true if the chunk matched a change command and was handled, false otherwise.
+// Works in any voice mode — called from both global commands and entry mode.
+function applyChangeCommand(chunk) {
+  // "change keyword to [value]"
+  let m = chunk.match(/\bchange\s+keyword\s+to\s+(.+)/i);
+  if (m) {
+    const cat = document.getElementById('f-category').value.trim();
+    document.getElementById('f-keyword').value = fixTechnicalString(m[1].trim().replace(/[.,;]+$/, ''), cat);
+    return true;
+  }
+
+  // "change category to [value]"
+  m = chunk.match(/\bchange\s+categor(?:y|ies)\s+to\s+(.+)/i);
+  if (m) {
+    const newCat = matchCategory(m[1].trim().replace(/[.,;]+$/, ''));
+    document.getElementById('f-category').value = newCat;
+    const kw = document.getElementById('f-keyword').value.trim();
+    if (kw) document.getElementById('f-keyword').value = fixTechnicalString(kw, newCat);
+    return true;
+  }
+
+  // "change note to [value]"
+  m = chunk.match(/\bchange\s+note\s+to\s+(.+)/i);
+  if (m) {
+    document.getElementById('f-note').value = applyCyberTerms(m[1].trim().replace(/[.,;]+$/, ''));
+    return true;
+  }
+
+  // "change book to [number]"
+  m = chunk.match(/\bchange\s+book\s+to\s+(.+)/i);
+  if (m) {
+    const raw = m[1].trim().replace(/[.,;]+$/, '');
+    const num = wordsToNumber(raw) || raw.replace(/\D/g, '');
+    if (num) { const nb = normalizeBook(num); document.getElementById('f-book').value = nb; lastBook = nb; }
+    return true;
+  }
+
+  // "change page to [number]"  — must NOT match "change page name to"
+  m = chunk.match(/\bchange\s+page\s+to\s+(.+)/i);
+  if (m) {
+    const raw = m[1].trim().replace(/[.,;]+$/, '');
+    const num = wordsToNumber(raw) || raw.replace(/\D/g, '');
+    if (num) { const dn = String(num).replace(/\D/g,''); document.getElementById('f-page').value = dn; lastPage = dn; }
+    return true;
+  }
+
+  // "change page name to [value]"
+  m = chunk.match(/\bchange\s+page\s+name\s+to\s+(.+)/i);
+  if (m) {
+    document.getElementById('f-page-name').value = m[1].trim().replace(/[.,;]+$/, '');
+    return true;
+  }
+
+  // "change section name to [value]"
+  m = chunk.match(/\bchange\s+section\s+(?:name\s+)?to\s+(.+)/i);
+  if (m) {
+    document.getElementById('f-section-name').value = m[1].trim().replace(/[.,;]+$/, '');
+    return true;
+  }
+
+  // "change source type to [slide/text]" — strictly "slide" or "text", nothing else
+  m = chunk.match(/\bchange\s+source(?:\s+type)?\s+to\s+(.+)/i);
+  if (m) {
+    const raw = m[1].trim().replace(/[.,;]+$/, '').toLowerCase();
+    const val = /slide/i.test(raw) ? 'Slide' : /text/i.test(raw) ? 'Text' : null;
+    if (val) document.getElementById('f-source-type').value = val;
+    return true;
+  }
+
+  // "change abbreviation to [letters]" / "acronym is [letters]"
+  m = chunk.match(/\b(?:change\s+(?:abbreviation|abbr)\s+to|acronym\s+is)\s+(.+)/i);
+  if (m) {
+    const raw = m[1].trim().replace(/[.,;]+$/, '');
+    const tokens = raw.split(/\s+/);
+    const val = tokens.every(t => t.length === 1)
+      ? tokens.join('').toUpperCase()
+      : normalizeSymbols(raw).toUpperCase().replace(/\s+/g, '');
+    document.getElementById('f-abbr').value = val;
+    return true;
+  }
+
+  // "clear [field]" — wipe just that field
+  // Matches: "clear note", "clear keyword", "clear category", "clear abbreviation",
+  //          "clear page name", "clear section name", "clear source type", "clear book", "clear page"
+  const clearMatch = chunk.match(/^clear\s+(note|keyword|category|abbreviation|abbr|page\s+name|section\s+name|source(?:\s+type)?|book|page)(?:\s+field)?\s*$/i);
+  if (clearMatch) {
+    const f = clearMatch[1].toLowerCase().replace(/\s+/g,' ');
+    if (f === 'note')                      document.getElementById('f-note').value = '';
+    else if (f === 'keyword')              document.getElementById('f-keyword').value = '';
+    else if (f === 'category')             document.getElementById('f-category').value = '';
+    else if (f === 'abbreviation' || f === 'abbr') document.getElementById('f-abbr').value = '';
+    else if (f === 'page name')            document.getElementById('f-page-name').value = '';
+    else if (f === 'section name')         document.getElementById('f-section-name').value = '';
+    else if (f === 'source' || f === 'source type') document.getElementById('f-source-type').value = '';
+    else if (f === 'book')                 { document.getElementById('f-book').value = ''; }
+    else if (f === 'page')                 { document.getElementById('f-page').value = ''; }
+    return true;
+  }
+
+  return false; // not a change command
+}
+
+// ── TRANSCRIPT FIELD EXTRACTOR ──
+// Scans allTimeTranscript from the END for the most recent occurrence of a field label,
+// returns whatever text followed it (up to the next field label or end of string).
+function extractFromTranscript(fieldPattern) {
+  const t = allTimeTranscript.trim();
+  if (!t) return null;
+
+  // All field labels as stop-boundaries
+  const STOP = '(?=\\s*(?:note\\b|keyword\\b|categor(?:y|ies)\\b|abbreviation\\b|abbr\\b|page\\s+name\\b|section\\s+name\\b|source(?:\\s+type)?\\b|fill\\s+in\\b|add\\s+to\\s+index|cancel\\b|new\\s+entry\\b)|$)';
+  const fullRe = new RegExp(fieldPattern.source + '\\s+(?:is\\s+|are\\s+)?(.+?)' + STOP, 'gi');
+
+  let lastMatch = null;
+  let m;
+  while ((m = fullRe.exec(t)) !== null) {
+    lastMatch = m;
+  }
+  if (!lastMatch) return null;
+  return lastMatch[lastMatch.length - 1].trim().replace(/[.,;]+$/, '');
+}
+
+function clearForm() {
+  ['f-book','f-page','f-keyword','f-abbr','f-note','f-category','f-page-name','f-section-name','f-source-type'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+// ── PERSISTENCE ──
+const STORAGE_KEY = 'book-index-builder-entries';
+
+function saveIndex() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, entryId, lastBook, lastPage, pageNameMap }));
+  } catch(e) {
+    console.warn('Could not save index:', e);
+  }
+}
+
+function loadIndex() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.entries) || data.entries.length === 0) return;
+    entries = data.entries;
+    entryId = data.entryId || entries.length;
+    lastBook = data.lastBook || '1';
+    lastPage = data.lastPage || '';
+    pageNameMap = data.pageNameMap || {};
+    // Rebuild table
+    const tbody = document.getElementById('index-body');
+    const emptyRow = document.getElementById('empty-row');
+    if (emptyRow) emptyRow.remove();
+    entries.forEach(entry => renderRow(entry));
+    updateCount();
+    setParseStatus('✓ Restored ' + entries.length + ' saved entr' + (entries.length === 1 ? 'y' : 'ies'), 'success');
+    setTimeout(() => setParseStatus('', ''), 3000);
+    updateUndoBtn();
+  } catch(e) {
+    console.warn('Could not load index:', e);
+  }
+}
+
+function clearAll() {
+  if (entries.length === 0) return;
+  if (!confirm('Delete all ' + entries.length + ' entries?')) return;
+  entries = [];
+  entryId = 0;
+  showEmpty();
+  updateCount();
+  saveIndex();
+  toast('All entries deleted.');
+}
+
+// ── EXPORT ──
+function exportSession() {
+  if (entries.length === 0 && sessionNotes.length === 0) {
+    toast('Nothing to export.');
+    return;
+  }
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    lastBook,
+    pageNameMap,
+    lastPage,
+    entryId,
+    entries,
+    sessionNotes
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const date = new Date().toISOString().slice(0,10);
+  download('book-index-session-' + date + '.json', json, 'application/json');
+  lastAutoExportTime = Date.now();
+  entriesSinceExport = 0;
+  toast('Session exported — ' + entries.length + ' entries.');
+}
+
+function importSession(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.version || !Array.isArray(data.entries)) {
+        toast('Invalid session file.');
+        return;
+      }
+
+      const incoming = data.entries.length;
+      const existing = entries.length;
+
+      if (existing > 0) {
+        const choice = confirm(
+          'You have ' + existing + ' existing entries.\n\n' +
+          'OK = Merge imported entries with existing\n' +
+          'Cancel = Replace everything with imported session'
+        );
+        if (choice) {
+          // Merge — re-ID incoming entries to avoid conflicts
+          const maxId = entries.reduce((m, e) => Math.max(m, e.id), 0);
+          let offset = maxId;
+          data.entries.forEach(entry => {
+            entry.id = ++offset;
+            entries.push(entry);
+            renderRow(entry);
+          });
+          entryId = offset;
+        } else {
+          // Replace
+          entries = [];
+          entryId = data.entryId || data.entries.length;
+          lastBook = data.lastBook || '1';
+          lastPage = data.lastPage || '';
+          pageNameMap = Object.assign(pageNameMap, data.pageNameMap || {});
+          document.getElementById('index-body').innerHTML = '';
+          showEmpty();
+          data.entries.forEach(entry => {
+            entries.push(entry);
+            renderRow(entry);
+          });
+        }
+      } else {
+        // Nothing existing — just load
+        entries = data.entries;
+        entryId = data.entryId || data.entries.length;
+        lastBook = data.lastBook || '1';
+        lastPage = data.lastPage || '';
+          pageNameMap = Object.assign(pageNameMap, data.pageNameMap || {});
+        document.getElementById('index-body').innerHTML = '';
+        showEmpty();
+        entries.forEach(entry => renderRow(entry));
+      }
+
+      // Merge session notes too
+      if (Array.isArray(data.sessionNotes)) {
+        data.sessionNotes.forEach(note => {
+          if (!sessionNotes.find(n => n.ts === note.ts && n.text === note.text)) {
+            sessionNotes.push(note);
+            renderSessionNote(note);
+          }
+        });
+      }
+
+      updateCount();
+      saveIndex();
+      updateUndoBtn();
+      toast('Imported ' + incoming + ' entries.');
+      // Reset file input so same file can be re-imported if needed
+      event.target.value = '';
+    } catch(err) {
+      toast('Could not read session file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportCSV() {
+  if (entries.length === 0) { toast('Nothing to export.'); return; }
+  const header = ['Book','Page','Keyword','Abbreviation','Page Name','Section Name','Source Type','Category','Note'];
+  const rows = entries.map(e => [e.book, e.page, e.keyword, e.abbr||'', e.pageName||'', e.sectionName||'', e.sourceType||'', e.category, e.note].map(csvEscape));
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  download('book-index.csv', csv, 'text/csv');
+  toast('CSV exported!');
+}
+
+function exportTSV() {
+  if (entries.length === 0) { toast('Nothing to export.'); return; }
+  const header = ['Book','Page','Keyword','Abbreviation','Page Name','Section Name','Source Type','Category','Note'];
+  const rows = entries.map(e => [e.book, e.page, e.keyword, e.abbr||'', e.pageName||'', e.sectionName||'', e.sourceType||'', e.category, e.note]);
+  const tsv = [header, ...rows].map(r => r.join('\t')).join('\n');
+  download('book-index.tsv', tsv, 'text/tab-separated-values');
+  toast('TSV exported!');
+}
+
+function download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(val) {
+  val = String(val || '');
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return '"' + val.replace(/"/g, '""') + '"';
+  }
+  return val;
+}
+
+// ── SESSION NOTES ──
+let sessionNotes = [];
+
+function addSessionNote(text) {
+  const ts = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const note = { ts, text };
+  sessionNotes.push(note);
+  renderSessionNote(note);
+  saveSessionNotes();
+  toast('Session note saved.');
+}
+
+function addSessionNoteManual() {
+  const input = document.getElementById('session-note-input');
+  const text = input.value.trim();
+  if (!text) return;
+  addSessionNote(text);
+  input.value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('session-note-input');
+  if (input) input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSessionNoteManual();
+  });
+});
+
+function renderSessionNote(note) {
+  const list = document.getElementById('session-notes-list');
+  const row = document.createElement('div');
+  row.className = 'session-note-row';
+  row.innerHTML = '<span class="session-note-ts">' + esc(note.ts) + '</span>'
+    + '<span class="session-note-text">' + esc(note.text) + '</span>';
+  list.appendChild(row);
+  list.scrollTop = list.scrollHeight;
+}
+
+function saveSessionNotes() {
+  try {
+    localStorage.setItem('book-index-session-notes', JSON.stringify(sessionNotes));
+  } catch(e) {}
+}
+
+function loadSessionNotes() {
+  try {
+    const raw = localStorage.getItem('book-index-session-notes');
+    if (!raw) return;
+    sessionNotes = JSON.parse(raw) || [];
+    sessionNotes.forEach(renderSessionNote);
+  } catch(e) {}
+}
+
+// ── UNDO ──
+function undoLast() {
+  // Simple undo — remove last entry, no field restore
+  if (entries.length === 0) return;
+  const removed = entries.pop();
+  const row = document.getElementById('row-' + removed.id);
+  if (row) row.remove();
+  if (entries.length === 0) showEmpty();
+  updateCount();
+  saveIndex();
+  updateUndoBtn();
+  toast('Undone: ' + removed.keyword);
+}
+
+function restoreLastEntry() {
+  // Pull last entry out of index AND restore all its data into the input fields
+  if (entries.length === 0) { toast('Nothing to restore.'); return; }
+  const entry = entries.pop();
+  const row = document.getElementById('row-' + entry.id);
+  if (row) row.remove();
+  if (entries.length === 0) showEmpty();
+  updateCount();
+  saveIndex();
+  updateUndoBtn();
+
+  // Restore all fields
+  document.getElementById('f-book').value        = entry.book || '';
+  document.getElementById('f-page').value        = String(entry.page || '').replace(/\D/g, '');
+  document.getElementById('f-keyword').value     = entry.keyword     || '';
+  document.getElementById('f-abbr').value        = entry.abbr        || '';
+  document.getElementById('f-category').value    = entry.category    || '';
+  document.getElementById('f-note').value        = entry.note        || '';
+  document.getElementById('f-page-name').value   = entry.pageName    || '';
+  document.getElementById('f-section-name').value = entry.sectionName || '';
+  document.getElementById('f-source-type').value = entry.sourceType  || '';
+
+  // Also restore lastBook/lastPage memory so next entry continues from here
+  if (entry.book)  lastBook = entry.book;
+  if (entry.page)  lastPage = entry.page;
+
+  // Switch to entry mode so "add to index" works directly
+  voiceMode = 'entry';
+  entryBuffer = [
+    'page ' + (entry.page || lastPage),
+    entry.keyword ? 'keyword ' + entry.keyword : '',
+    entry.category ? 'category ' + entry.category : '',
+    entry.note ? 'note ' + entry.note : '',
+  ].filter(Boolean).join(' ');
+
+  micStatus.textContent = '● RESTORED — edit fields then say "add to index"';
+  setParseStatus('✓ Entry restored — edit and say "add to index" to resubmit', 'success');
+  toast('Restored: ' + (entry.keyword || 'entry'));
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('undo-btn');
+  if (btn) btn.disabled = entries.length === 0;
+}
+
+// ── UTILS ──
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let toastTimer;
+let lastAutoExportTime = Date.now();
+let entriesSinceExport = 0;
+const AUTO_EXPORT_INTERVAL = 60 * 60 * 1000; // 1 hour
+const AUTO_EXPORT_ENTRIES = 10;
+
+// Hourly timer check
+setInterval(() => {
+  if (entries.length === 0) return;
+  if (Date.now() - lastAutoExportTime >= AUTO_EXPORT_INTERVAL) {
+    autoExport('1 hour');
+  }
+}, 60 * 1000);
+
+function autoExport(reason) {
+  if (entries.length === 0) return;
+  const payload = { version:1, exportedAt: new Date().toISOString(), lastBook, lastPage, pageNameMap, entryId, entries, sessionNotes };
+  const json = JSON.stringify(payload, null, 2);
+  const ts = new Date().toISOString().replace('T','-').slice(0,16).replace(':','-');
+  download('book-index-auto-' + ts + '.json', json, 'application/json');
+  lastAutoExportTime = Date.now();
+  entriesSinceExport = 0;
+  toast('⬇ Auto-saved: ' + entries.length + ' entries (' + reason + ')');
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── STATUS & THINKING BAR ──
+let thinkingTimer = null;
+
+function setParseStatus(msg, type) {
+  const el = document.getElementById('parse-status');
+  if (!el) return;
+  hideThinking();
+  el.textContent = msg;
+  el.className = 'parse-status' + (msg ? ' show' : '') + (type ? ' ' + type : '');
+}
+
+function showThinking(msg) {
+  const bar = document.getElementById('thinking-bar');
+  const label = document.getElementById('thinking-msg');
+  if (!bar || !label) return;
+  label.textContent = msg || 'Processing...';
+  bar.classList.add('show');
+  // Auto-hide after 6s as a safety net
+  clearTimeout(thinkingTimer);
+  thinkingTimer = setTimeout(() => hideThinking(), 6000);
+}
+
+function hideThinking() {
+  clearTimeout(thinkingTimer);
+  const bar = document.getElementById('thinking-bar');
+  if (bar) bar.classList.remove('show');
+}
+
+// Keyboard shortcut: Space bar to toggle mic when not in input
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.activeElement.tagName === 'BODY') {
+    e.preventDefault();
+    toggleRecording();
+  }
+});
+
+// Auto-load saved index and session notes on startup
+loadIndex();
+loadSessionNotes();
+</script>
+</body>
+</html>
