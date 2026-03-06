@@ -381,6 +381,32 @@
     gap: 8px;
     flex-shrink: 0;
     background: var(--surface);
+    flex-wrap: wrap;
+  }
+
+  .auto-export-bar {
+    padding: 6px 20px 8px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.68rem;
+    border-top: 1px solid rgba(58,53,48,0.4);
+    flex-shrink: 0;
+  }
+  .auto-export-label {
+    color: var(--accent2);
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  #auto-export-status {
+    color: var(--success);
+    white-space: nowrap;
+  }
+  .auto-export-hint {
+    color: var(--muted);
+    font-style: italic;
   }
 
   /* TOAST */
@@ -664,6 +690,11 @@
       <button class="btn btn-secondary" onclick="restoreLastEntry()" id="undo-btn" disabled title="Remove last entry and restore to fields">↩ Restore Last</button>
       <button class="btn btn-danger" onclick="clearAll()">🗑 Delete Index</button>
     </div>
+    <div class="auto-export-bar">
+      <span class="auto-export-label">⏱ AUTO-SAVE:</span>
+      <span id="auto-export-status">No auto-save yet this session</span>
+      <span class="auto-export-hint">every 10 entries or 1 hour · saves as book-index-latest.json</span>
+    </div>
 
     <!-- SESSION NOTES -->
     <div class="session-notes-panel">
@@ -801,6 +832,8 @@ function startRecording() {
         micStatus.classList.add('active');
         transcriptBox.innerHTML = '<span class="placeholder">Resumed. Ready for next entry...</span>';
         toast('Recording resumed.');
+        // Restart recognition fresh immediately
+        try { recognition.start(); } catch(e) {}
       }
       // ignore everything else while paused
       return;
@@ -824,10 +857,12 @@ function startRecording() {
         awaitingNoteContent = false;
         awaitingField = null;
       sessionFinal = '';
+      // Stop recognition immediately — onend won't restart because isPaused=true
+      try { recognition.stop(); } catch(e) {}
       micBtn.classList.remove('recording');
       micBtn.classList.add('paused');
       micBtn.textContent = '⏸';
-      micStatus.textContent = '⏸ PAUSED — say "resume" or "continue listening" to continue';
+      micStatus.textContent = '⏸ PAUSED — say "resume listening" or "continue listening" to continue';
       micStatus.classList.remove('active');
       micStatus.classList.add('paused-state');
       transcriptBox.innerHTML = '<span class="placeholder">Paused. Say "resume listening" or "continue listening" when ready...</span>';
@@ -1278,8 +1313,8 @@ function startRecording() {
   };
 
   recognition.onend = () => {
-    if (isRecording) {
-      // Auto-restart to keep mic alive
+    if (isRecording && !isPaused) {
+      // Auto-restart to keep mic alive — but NOT when paused
       lastRestartTime = Date.now();
       try { recognition.start(); } catch(e) {}
     }
@@ -1357,6 +1392,10 @@ function normalizeBook(raw) {
     const name = posterMatch[1].trim().replace(/\w/g, c => c.toUpperCase());
     return 'Poster: ' + name;
   }
+
+  // "Book 1", "Book 2" — treat as plain number
+  const bookNumMatch = s.match(/^book\s+(\d+)$/i);
+  if (bookNumMatch) return bookNumMatch[1];
 
   // Plain digit
   if (/^\d+$/.test(s)) return s;
@@ -1959,7 +1998,8 @@ function processNoteVal(raw) {
 
 // ── ENTRIES ──
 function addManualEntry(silent) {
-  const book = normalizeBook(document.getElementById('f-book').value.trim()) || lastBook;
+  const bookRaw = document.getElementById('f-book').value.trim();
+  const book = bookRaw ? normalizeBook(bookRaw) || bookRaw : lastBook;
   const page = document.getElementById('f-page').value.trim().replace(/\D/g, '');
   const keyword = document.getElementById('f-keyword').value.trim();
   const note = document.getElementById('f-note').value.trim();
@@ -2263,6 +2303,7 @@ function exportSession() {
   download('book-index-session-' + date + '.json', json, 'application/json');
   lastAutoExportTime = Date.now();
   entriesSinceExport = 0;
+  updateAutoExportStatus();
   toast('Session exported — ' + entries.length + ' entries.');
 }
 
@@ -2498,6 +2539,7 @@ function esc(s) {
 
 let toastTimer;
 let lastAutoExportTime = Date.now();
+const startTime = lastAutoExportTime; // reference point for "no save yet" check
 let entriesSinceExport = 0;
 const AUTO_EXPORT_INTERVAL = 60 * 60 * 1000; // 1 hour
 const AUTO_EXPORT_ENTRIES = 10;
@@ -2514,11 +2556,25 @@ function autoExport(reason) {
   if (entries.length === 0) return;
   const payload = { version:1, exportedAt: new Date().toISOString(), lastBook, lastPage, pageNameMap, entryId, entries, sessionNotes };
   const json = JSON.stringify(payload, null, 2);
-  const ts = new Date().toISOString().replace('T','-').slice(0,16).replace(':','-');
-  download('book-index-auto-' + ts + '.json', json, 'application/json');
+  // Always same filename — overwrites in OneDrive folder automatically
+  download('book-index-latest.json', json, 'application/json');
   lastAutoExportTime = Date.now();
   entriesSinceExport = 0;
+  updateAutoExportStatus();
   toast('⬇ Auto-saved: ' + entries.length + ' entries (' + reason + ')');
+}
+
+function updateAutoExportStatus() {
+  const el = document.getElementById('auto-export-status');
+  if (!el) return;
+  if (lastAutoExportTime === startTime) {
+    el.textContent = 'No auto-save yet';
+  } else {
+    const t = new Date(lastAutoExportTime);
+    const hh = String(t.getHours()).padStart(2,'0');
+    const mm = String(t.getMinutes()).padStart(2,'0');
+    el.textContent = 'Auto-saved at ' + hh + ':' + mm + ' · ' + entries.length + ' entries';
+  }
 }
 function toast(msg) {
   const el = document.getElementById('toast');
